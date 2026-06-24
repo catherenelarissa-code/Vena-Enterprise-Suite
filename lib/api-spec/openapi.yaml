@@ -1,22 +1,27 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Vena - Gestão Inteligente de Compras e Obras
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: dashboard
+  - name: suppliers
+  - name: purchases
+  - name: financial
+  - name: projects
+  - name: materials
+  - name: price-monitor
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,976 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # AUTH
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/request-access:
+    post:
+      operationId: requestAccess
+      tags: [auth]
+      summary: Request access to the system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessRequestInput"
+      responses:
+        "201":
+          description: Access request sent
+
+  /auth/set-password:
+    post:
+      operationId: setPassword
+      tags: [auth]
+      summary: Set password for first access
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPasswordInput"
+      responses:
+        "200":
+          description: Password set
+
+  /auth/users:
+    get:
+      operationId: listUsers
+      tags: [auth]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /auth/users/{id}/approve:
+    post:
+      operationId: approveUser
+      tags: [auth]
+      summary: Approve user access request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User approved
+
+  # DASHBOARD
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get overall dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/cash-flow:
+    get:
+      operationId: getDashboardCashFlow
+      tags: [dashboard]
+      summary: Get cash flow for next 30/60/90 days
+      responses:
+        "200":
+          description: Cash flow projection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashFlowProjection"
+
+  /dashboard/projects-overview:
+    get:
+      operationId: getDashboardProjectsOverview
+      tags: [dashboard]
+      summary: Get projects budget vs actual overview
+      responses:
+        "200":
+          description: Projects overview
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectOverview"
+
+  /dashboard/alerts:
+    get:
+      operationId: getDashboardAlerts
+      tags: [dashboard]
+      summary: Get active alerts (low stock, price drops, due bills)
+      responses:
+        "200":
+          description: Active alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Alert"
+
+  # SUPPLIERS
+  /suppliers:
+    get:
+      operationId: listSuppliers
+      tags: [suppliers]
+      summary: List suppliers
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of suppliers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Supplier"
+    post:
+      operationId: createSupplier
+      tags: [suppliers]
+      summary: Create supplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupplierInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supplier"
+
+  /suppliers/{id}:
+    get:
+      operationId: getSupplier
+      tags: [suppliers]
+      summary: Get supplier by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Supplier
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supplier"
+    patch:
+      operationId: updateSupplier
+      tags: [suppliers]
+      summary: Update supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupplierUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supplier"
+    delete:
+      operationId: deleteSupplier
+      tags: [suppliers]
+      summary: Delete supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /suppliers/{id}/evaluate:
+    post:
+      operationId: evaluateSupplier
+      tags: [suppliers]
+      summary: Add evaluation to supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupplierEvaluationInput"
+      responses:
+        "201":
+          description: Evaluation added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierEvaluation"
+
+  /suppliers/{id}/price-history:
+    get:
+      operationId: listSupplierPriceHistory
+      tags: [suppliers]
+      summary: Get price history for a supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Price history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PriceHistoryEntry"
+
+  # PURCHASE REQUESTS
+  /purchases/requests:
+    get:
+      operationId: listPurchaseRequests
+      tags: [purchases]
+      summary: List purchase requests
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of purchase requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PurchaseRequest"
+    post:
+      operationId: createPurchaseRequest
+      tags: [purchases]
+      summary: Create purchase request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurchaseRequestInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseRequest"
+
+  /purchases/requests/{id}:
+    get:
+      operationId: getPurchaseRequest
+      tags: [purchases]
+      summary: Get purchase request by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Purchase request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseRequest"
+    patch:
+      operationId: updatePurchaseRequest
+      tags: [purchases]
+      summary: Update purchase request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurchaseRequestUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseRequest"
+
+  # QUOTES
+  /purchases/quotes:
+    get:
+      operationId: listQuotes
+      tags: [purchases]
+      summary: List quotes
+      parameters:
+        - name: request_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of quotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quote"
+    post:
+      operationId: createQuote
+      tags: [purchases]
+      summary: Create quote from supplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+
+  /purchases/quotes/{id}/approve:
+    post:
+      operationId: approveQuote
+      tags: [purchases]
+      summary: Approve quote and generate purchase order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quote approved and PO generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+
+  /purchases/quotes/compare:
+    get:
+      operationId: compareQuotes
+      tags: [purchases]
+      summary: Compare quotes for a purchase request
+      parameters:
+        - name: request_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quote comparison
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteComparison"
+
+  # PURCHASE ORDERS
+  /purchases/orders:
+    get:
+      operationId: listPurchaseOrders
+      tags: [purchases]
+      summary: List purchase orders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: supplier_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of purchase orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PurchaseOrder"
+
+  /purchases/orders/{id}:
+    get:
+      operationId: getPurchaseOrder
+      tags: [purchases]
+      summary: Get purchase order by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Purchase order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+
+  /purchases/history:
+    get:
+      operationId: getPurchaseHistory
+      tags: [purchases]
+      summary: Get purchase history with price comparison
+      parameters:
+        - name: material
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Purchase history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PurchaseHistoryEntry"
+
+  # FINANCIAL
+  /financial/accounts:
+    get:
+      operationId: listFinancialAccounts
+      tags: [financial]
+      summary: List accounts payable and receivable
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [payable, receivable]
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: due_in_days
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Financial accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FinancialAccount"
+    post:
+      operationId: createFinancialAccount
+      tags: [financial]
+      summary: Create financial account (payable or receivable)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinancialAccountInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialAccount"
+
+  /financial/accounts/{id}:
+    patch:
+      operationId: updateFinancialAccount
+      tags: [financial]
+      summary: Update financial account (e.g. mark as paid)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinancialAccountUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialAccount"
+
+  /financial/expenses-by-project:
+    get:
+      operationId: getExpensesByProject
+      tags: [financial]
+      summary: Get expenses grouped by project
+      responses:
+        "200":
+          description: Expenses by project
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectExpenseSummary"
+
+  /financial/monthly-summary:
+    get:
+      operationId: getFinancialMonthlySummary
+      tags: [financial]
+      summary: Get monthly income/expense summary
+      responses:
+        "200":
+          description: Monthly summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonthlySummary"
+
+  # PROJECTS (OBRAS)
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List projects/obras
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get project by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}/budget-analysis:
+    get:
+      operationId: getProjectBudgetAnalysis
+      tags: [projects]
+      summary: Get budget vs actual analysis for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Budget analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetAnalysis"
+
+  # MATERIALS / INVENTORY
+  /materials:
+    get:
+      operationId: listMaterials
+      tags: [materials]
+      summary: List materials/inventory
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+        - name: low_stock
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Material"
+    post:
+      operationId: createMaterial
+      tags: [materials]
+      summary: Create material/inventory item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Material"
+
+  /materials/{id}:
+    get:
+      operationId: getMaterial
+      tags: [materials]
+      summary: Get material by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Material
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Material"
+    patch:
+      operationId: updateMaterial
+      tags: [materials]
+      summary: Update material (including stock quantity)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Material"
+
+  /materials/categories:
+    get:
+      operationId: listMaterialCategories
+      tags: [materials]
+      summary: List material categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaterialCategory"
+
+  /materials/low-stock-alerts:
+    get:
+      operationId: getLowStockAlerts
+      tags: [materials]
+      summary: Get materials with low stock
+      responses:
+        "200":
+          description: Low stock materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Material"
+
+  # PRICE MONITORING
+  /price-monitor/products:
+    get:
+      operationId: listMonitoredProducts
+      tags: [price-monitor]
+      summary: List monitored products
+      responses:
+        "200":
+          description: Monitored products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonitoredProduct"
+    post:
+      operationId: createMonitoredProduct
+      tags: [price-monitor]
+      summary: Add product to price monitor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MonitoredProductInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitoredProduct"
+
+  /price-monitor/products/{id}:
+    get:
+      operationId: getMonitoredProduct
+      tags: [price-monitor]
+      summary: Get monitored product with price history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Monitored product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitoredProduct"
+    delete:
+      operationId: deleteMonitoredProduct
+      tags: [price-monitor]
+      summary: Remove product from monitor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /price-monitor/products/{id}/price-history:
+    get:
+      operationId: listProductPriceHistory
+      tags: [price-monitor]
+      summary: Get price history for a monitored product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Price history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PricePoint"
+
+  /price-monitor/supplier-comparison:
+    get:
+      operationId: getSupplierPriceComparison
+      tags: [price-monitor]
+      summary: Compare prices across suppliers for a product
+      parameters:
+        - name: product_name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Supplier comparison
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupplierPriceEntry"
+
+  /price-monitor/alerts:
+    get:
+      operationId: listPriceAlerts
+      tags: [price-monitor]
+      summary: List active price alerts
+      responses:
+        "200":
+          description: Price alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PriceAlert"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +1009,884 @@ components:
       required:
         - status
 
+    # AUTH
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    AuthResult:
+      type: object
+      required: [user, token]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+
+    User:
+      type: object
+      required: [id, name, email, role, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, engineer, foreman]
+        department:
+          type: ["string", "null"]
+        position:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, pending, inactive]
+        createdAt:
+          type: string
+
+    AccessRequestInput:
+      type: object
+      required: [name, email, department, position]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        department:
+          type: string
+        position:
+          type: string
+
+    SetPasswordInput:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+
+    # DASHBOARD
+    DashboardSummary:
+      type: object
+      required: [cashBalance, payableThisWeek, receivableThisWeek, pendingPurchases, activeProjects, lowStockItems, totalSavedThisMonth]
+      properties:
+        cashBalance:
+          type: number
+        payableThisWeek:
+          type: number
+        receivableThisWeek:
+          type: number
+        pendingPurchases:
+          type: integer
+        activeProjects:
+          type: integer
+        lowStockItems:
+          type: integer
+        totalSavedThisMonth:
+          type: number
+
+    CashFlowProjection:
+      type: object
+      required: [days30, days60, days90, monthly]
+      properties:
+        days30:
+          type: number
+        days60:
+          type: number
+        days90:
+          type: number
+        monthly:
+          type: array
+          items:
+            $ref: "#/components/schemas/CashFlowMonth"
+
+    CashFlowMonth:
+      type: object
+      required: [month, income, expenses, balance]
+      properties:
+        month:
+          type: string
+        income:
+          type: number
+        expenses:
+          type: number
+        balance:
+          type: number
+
+    ProjectOverview:
+      type: object
+      required: [id, name, budgeted, spent, percentUsed, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        budgeted:
+          type: number
+        spent:
+          type: number
+        percentUsed:
+          type: number
+        status:
+          type: string
+
+    Alert:
+      type: object
+      required: [id, type, title, message, severity, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [low_stock, price_drop, due_payment, budget_exceeded, quote_pending]
+        title:
+          type: string
+        message:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, urgent]
+        relatedId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    # SUPPLIERS
+    Supplier:
+      type: object
+      required: [id, name, category, contact, cnpj, avgPriceScore, avgDeliveryScore, avgQualityScore, totalPurchases]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        contact:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        cnpj:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        avgPriceScore:
+          type: number
+        avgDeliveryScore:
+          type: number
+        avgQualityScore:
+          type: number
+        totalPurchases:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    SupplierInput:
+      type: object
+      required: [name, category, contact]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        contact:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        cnpj:
+          type: string
+        address:
+          type: string
+        notes:
+          type: string
+
+    SupplierUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        contact:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        cnpj:
+          type: string
+        address:
+          type: string
+        notes:
+          type: string
+
+    SupplierEvaluationInput:
+      type: object
+      required: [priceScore, deliveryScore, qualityScore]
+      properties:
+        priceScore:
+          type: number
+        deliveryScore:
+          type: number
+        qualityScore:
+          type: number
+        notes:
+          type: string
+        purchaseOrderId:
+          type: integer
+
+    SupplierEvaluation:
+      type: object
+      required: [id, supplierId, priceScore, deliveryScore, qualityScore, createdAt]
+      properties:
+        id:
+          type: integer
+        supplierId:
+          type: integer
+        priceScore:
+          type: number
+        deliveryScore:
+          type: number
+        qualityScore:
+          type: number
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    PriceHistoryEntry:
+      type: object
+      required: [date, material, unitPrice, quantity, total]
+      properties:
+        date:
+          type: string
+        material:
+          type: string
+        unitPrice:
+          type: number
+        quantity:
+          type: number
+        total:
+          type: number
+
+    # PURCHASE REQUESTS
+    PurchaseRequest:
+      type: object
+      required: [id, title, requestedBy, projectId, status, items, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        requestedBy:
+          type: string
+        projectId:
+          type: ["integer", "null"]
+        projectName:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, quoting, approved, ordered, delivered, cancelled]
+        urgency:
+          type: string
+          enum: [low, normal, high, urgent]
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseRequestItem"
+        createdAt:
+          type: string
+
+    PurchaseRequestItem:
+      type: object
+      required: [id, materialName, quantity, unit]
+      properties:
+        id:
+          type: integer
+        materialName:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        notes:
+          type: ["string", "null"]
+
+    PurchaseRequestInput:
+      type: object
+      required: [title, items]
+      properties:
+        title:
+          type: string
+        projectId:
+          type: integer
+        urgency:
+          type: string
+          enum: [low, normal, high, urgent]
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseRequestItemInput"
+
+    PurchaseRequestItemInput:
+      type: object
+      required: [materialName, quantity, unit]
+      properties:
+        materialName:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        notes:
+          type: string
+
+    PurchaseRequestUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        urgency:
+          type: string
+        notes:
+          type: string
+
+    # QUOTES
+    Quote:
+      type: object
+      required: [id, purchaseRequestId, supplierId, supplierName, totalAmount, deliveryDays, status, createdAt]
+      properties:
+        id:
+          type: integer
+        purchaseRequestId:
+          type: integer
+        supplierId:
+          type: integer
+        supplierName:
+          type: string
+        totalAmount:
+          type: number
+        deliveryDays:
+          type: integer
+        freightCost:
+          type: ["number", "null"]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteItem"
+        createdAt:
+          type: string
+
+    QuoteItem:
+      type: object
+      required: [id, materialName, quantity, unit, unitPrice, total]
+      properties:
+        id:
+          type: integer
+        materialName:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        unitPrice:
+          type: number
+        total:
+          type: number
+
+    QuoteInput:
+      type: object
+      required: [purchaseRequestId, supplierId, deliveryDays, items]
+      properties:
+        purchaseRequestId:
+          type: integer
+        supplierId:
+          type: integer
+        deliveryDays:
+          type: integer
+        freightCost:
+          type: number
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteItemInput"
+
+    QuoteItemInput:
+      type: object
+      required: [materialName, quantity, unit, unitPrice]
+      properties:
+        materialName:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        unitPrice:
+          type: number
+
+    QuoteComparison:
+      type: object
+      required: [purchaseRequestId, quotes, recommendedQuoteId]
+      properties:
+        purchaseRequestId:
+          type: integer
+        quotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quote"
+        recommendedQuoteId:
+          type: ["integer", "null"]
+        aiInsight:
+          type: ["string", "null"]
+
+    # PURCHASE ORDERS
+    PurchaseOrder:
+      type: object
+      required: [id, quoteId, supplierId, supplierName, projectId, totalAmount, status, createdAt]
+      properties:
+        id:
+          type: integer
+        quoteId:
+          type: integer
+        supplierId:
+          type: integer
+        supplierName:
+          type: string
+        projectId:
+          type: ["integer", "null"]
+        projectName:
+          type: ["string", "null"]
+        totalAmount:
+          type: number
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, delivered, cancelled]
+        expectedDelivery:
+          type: ["string", "null"]
+        deliveredAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    PurchaseHistoryEntry:
+      type: object
+      required: [date, supplier, material, quantity, unit, unitPrice, total]
+      properties:
+        date:
+          type: string
+        supplier:
+          type: string
+        material:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        unitPrice:
+          type: number
+        total:
+          type: number
+        vsAvgPercent:
+          type: ["number", "null"]
+
+    # FINANCIAL
+    FinancialAccount:
+      type: object
+      required: [id, type, description, amount, dueDate, status, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [payable, receivable]
+        description:
+          type: string
+        amount:
+          type: number
+        dueDate:
+          type: string
+        paidAt:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, paid, overdue, cancelled]
+        projectId:
+          type: ["integer", "null"]
+        projectName:
+          type: ["string", "null"]
+        supplierId:
+          type: ["integer", "null"]
+        supplierName:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    FinancialAccountInput:
+      type: object
+      required: [type, description, amount, dueDate]
+      properties:
+        type:
+          type: string
+          enum: [payable, receivable]
+        description:
+          type: string
+        amount:
+          type: number
+        dueDate:
+          type: string
+        projectId:
+          type: integer
+        supplierId:
+          type: integer
+        category:
+          type: string
+
+    FinancialAccountUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        paidAt:
+          type: string
+        amount:
+          type: number
+        dueDate:
+          type: string
+
+    ProjectExpenseSummary:
+      type: object
+      required: [projectId, projectName, totalExpenses, budgeted, percentUsed]
+      properties:
+        projectId:
+          type: integer
+        projectName:
+          type: string
+        totalExpenses:
+          type: number
+        budgeted:
+          type: number
+        percentUsed:
+          type: number
+
+    MonthlySummary:
+      type: object
+      required: [month, income, expenses, balance]
+      properties:
+        month:
+          type: string
+        income:
+          type: number
+        expenses:
+          type: number
+        balance:
+          type: number
+
+    # PROJECTS
+    Project:
+      type: object
+      required: [id, name, client, status, budget, spent, startDate, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        client:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [planning, active, paused, completed, cancelled]
+        budget:
+          type: number
+        spent:
+          type: number
+        startDate:
+          type: string
+        endDate:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        manager:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ProjectInput:
+      type: object
+      required: [name, client, budget, startDate]
+      properties:
+        name:
+          type: string
+        client:
+          type: string
+        description:
+          type: string
+        budget:
+          type: number
+        startDate:
+          type: string
+        endDate:
+          type: string
+        location:
+          type: string
+        manager:
+          type: string
+
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        client:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        budget:
+          type: number
+        endDate:
+          type: string
+        location:
+          type: string
+        manager:
+          type: string
+
+    BudgetAnalysis:
+      type: object
+      required: [projectId, projectName, budget, spent, committed, remaining, percentUsed, byCategory]
+      properties:
+        projectId:
+          type: integer
+        projectName:
+          type: string
+        budget:
+          type: number
+        spent:
+          type: number
+        committed:
+          type: number
+        remaining:
+          type: number
+        percentUsed:
+          type: number
+        byCategory:
+          type: array
+          items:
+            $ref: "#/components/schemas/BudgetCategoryBreakdown"
+
+    BudgetCategoryBreakdown:
+      type: object
+      required: [category, budgeted, spent]
+      properties:
+        category:
+          type: string
+        budgeted:
+          type: number
+        spent:
+          type: number
+
+    # MATERIALS
+    Material:
+      type: object
+      required: [id, name, category, unit, currentStock, minimumStock, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        unit:
+          type: string
+        currentStock:
+          type: number
+        minimumStock:
+          type: number
+        projectId:
+          type: ["integer", "null"]
+        projectName:
+          type: ["string", "null"]
+        lastPurchasePrice:
+          type: ["number", "null"]
+        location:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        isLowStock:
+          type: boolean
+        createdAt:
+          type: string
+
+    MaterialInput:
+      type: object
+      required: [name, category, unit, minimumStock]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        unit:
+          type: string
+        currentStock:
+          type: number
+        minimumStock:
+          type: number
+        projectId:
+          type: integer
+        location:
+          type: string
+        notes:
+          type: string
+
+    MaterialUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        currentStock:
+          type: number
+        minimumStock:
+          type: number
+        projectId:
+          type: integer
+        location:
+          type: string
+        notes:
+          type: string
+
+    MaterialCategory:
+      type: object
+      required: [name, count]
+      properties:
+        name:
+          type: string
+        count:
+          type: integer
+
+    # PRICE MONITORING
+    MonitoredProduct:
+      type: object
+      required: [id, name, category, currentPrice, lowestPrice30d, lowestPrice60d, lowestPrice90d, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        url:
+          type: ["string", "null"]
+        currentPrice:
+          type: number
+        lowestPrice30d:
+          type: number
+        lowestPrice60d:
+          type: number
+        lowestPrice90d:
+          type: number
+        priceChangePercent:
+          type: number
+        alertThresholdPercent:
+          type: number
+        aiInsight:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    MonitoredProductInput:
+      type: object
+      required: [name, category, currentPrice]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        url:
+          type: string
+        currentPrice:
+          type: number
+        alertThresholdPercent:
+          type: number
+
+    PricePoint:
+      type: object
+      required: [date, price]
+      properties:
+        date:
+          type: string
+        price:
+          type: number
+        supplier:
+          type: ["string", "null"]
+
+    SupplierPriceEntry:
+      type: object
+      required: [supplier, price, deliveryDays, rating]
+      properties:
+        supplier:
+          type: string
+        price:
+          type: number
+        deliveryDays:
+          type: integer
+        freight:
+          type: ["number", "null"]
+        rating:
+          type: number
+        isRecommended:
+          type: boolean
+
+    PriceAlert:
+      type: object
+      required: [id, productId, productName, type, message, priceBefore, priceAfter, createdAt]
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        productName:
+          type: string
+        type:
+          type: string
+          enum: [price_drop, lowest_in_30d, lowest_in_90d, stock_low]
+        message:
+          type: string
+        priceBefore:
+          type: number
+        priceAfter:
+          type: number
+        percentChange:
+          type: number
+        createdAt:
+          type: string

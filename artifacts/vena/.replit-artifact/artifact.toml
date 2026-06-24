@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Vena - Gestão Inteligente"
+version = "1.0.0"
+id = "artifacts/vena"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22590
+
+[services.development]
+run = "pnpm --filter @workspace/vena run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/vena", "run", "build" ]
+publicDir = "artifacts/vena/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22590"
+BASE_PATH = "/"

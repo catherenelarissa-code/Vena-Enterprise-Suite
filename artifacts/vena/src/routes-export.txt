@@ -1,0 +1,5 @@
+import { Dashboard } from "./pages/dashboard";
+import { Compras } from "./pages/compras";
+import { Financeiro } from "./pages/financeiro";
+
+// Add these to App.tsx router
