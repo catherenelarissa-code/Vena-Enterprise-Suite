@@ -28,9 +28,12 @@ app.use(
 );
 
 app.use(cors({
-  origin: true,
+  origin: process.env.FRONTEND_URL ?? true,
   credentials: true,
 }));
+
+app.set("trust proxy", 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -39,8 +42,9 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: process.env.NODE_ENV === "production",
     httpOnly: true,
+    sameSite: "none",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 }));
