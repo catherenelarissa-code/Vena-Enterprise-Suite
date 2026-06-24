@@ -1,0 +1,31 @@
+kind = "slides"
+previewPath = "/vena-deck/"
+title = "Vena - Apresentação Executiva"
+version = "1.0.0"
+id = "artifacts/vena-deck"
+router = "path"
+
+[[integratedSkills]]
+name = "slides"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/vena-deck/" ]
+localPort = 25217
+
+[services.development]
+run = "pnpm --filter @workspace/vena-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/vena-deck", "run", "build" ]
+publicDir = "artifacts/vena-deck/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25217"
+BASE_PATH = "/vena-deck/"

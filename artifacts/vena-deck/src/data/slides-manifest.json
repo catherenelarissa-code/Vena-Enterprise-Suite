@@ -1,0 +1,122 @@
+[
+  {
+    "id": "a1b2c3d4-0001-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 1,
+    "filepath": "src/pages/slides/Slide01Cover.tsx",
+    "title": "Vena — Plataforma de Gestão de Compras e Obras",
+    "description": "Slide de capa",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0002-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 2,
+    "filepath": "src/pages/slides/Slide02ExecutiveSummary.tsx",
+    "title": "Sumário Executivo",
+    "description": "Visão geral dos quatro pontos centrais da plataforma",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0003-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 3,
+    "filepath": "src/pages/slides/Slide03Problem.tsx",
+    "title": "O Problema — gestão fragmentada de compras",
+    "description": "Cinco pontos de falha da gestão atual",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0004-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 4,
+    "filepath": "src/pages/slides/Slide04Solution.tsx",
+    "title": "A Vena resolve os cinco pontos de falha com módulos integrados",
+    "description": "Cinco módulos integrados da plataforma",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0005-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 5,
+    "filepath": "src/pages/slides/Slide05Compras.tsx",
+    "title": "O módulo de Compras controla todo o ciclo de aquisição",
+    "description": "Fluxo de status e dados de solicitações",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0006-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 6,
+    "filepath": "src/pages/slides/Slide06Fornecedores.tsx",
+    "title": "O cadastro de fornecedores inclui avaliação multicritério",
+    "description": "Tabela de avaliação dos 5 fornecedores ativos",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0007-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 7,
+    "filepath": "src/pages/slides/Slide07Financeiro.tsx",
+    "title": "O módulo Financeiro consolida R$ 276.900 a pagar e R$ 299.000 a receber",
+    "description": "Principais contas a pagar e a receber",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0008-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 8,
+    "filepath": "src/pages/slides/Slide08Obras.tsx",
+    "title": "Cinco projetos são gerenciados com controle de orçamento em tempo real",
+    "description": "Tabela completa dos projetos com orçamento e status",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0009-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 9,
+    "filepath": "src/pages/slides/Slide09Materiais.tsx",
+    "title": "O estoque apresenta quatro itens abaixo do mínimo operacional",
+    "description": "Itens críticos e situação geral do estoque",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0010-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 10,
+    "filepath": "src/pages/slides/Slide10MonitorPrecos.tsx",
+    "title": "O Monitor com IA recomenda o melhor momento de compra",
+    "description": "Tabela de produtos monitorados com recomendações",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0011-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 11,
+    "filepath": "src/pages/slides/Slide11Dashboard.tsx",
+    "title": "O dashboard consolida os principais indicadores operacionais em tempo real",
+    "description": "KPIs do dashboard e economia mensal",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0012-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 12,
+    "filepath": "src/pages/slides/Slide12Acesso.tsx",
+    "title": "O acesso ao sistema é controlado por aprovação administrativa individual",
+    "description": "Segurança, autenticação e perfis de acesso",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0013-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 13,
+    "filepath": "src/pages/slides/Slide13Arquitetura.tsx",
+    "title": "A arquitetura é construída sobre tecnologias de mercado consolidadas",
+    "description": "Stack técnica: frontend, backend e dados",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0014-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 14,
+    "filepath": "src/pages/slides/Slide14Roadmap.tsx",
+    "title": "Três iniciativas estão priorizadas para o próximo ciclo",
+    "description": "Roadmap: PDF, NF-e e saving acumulado",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a1b2c3d4-0015-4e5f-8a9b-c0d1e2f3a4b5",
+    "position": 15,
+    "filepath": "src/pages/slides/Slide15Closing.tsx",
+    "title": "A Vena é o sistema de registro para compras e obras da empresa",
+    "description": "Slide de encerramento",
+    "speakerNotes": ""
+  }
+]
