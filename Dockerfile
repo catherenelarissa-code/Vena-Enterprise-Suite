@@ -8,7 +8,7 @@ COPY . .
 
 RUN pnpm install --no-frozen-lockfile
 
-RUN pnpm --filter @workspace/api-server run build
+RUN pnpm --filter @workspace/api-server run build && ls -la artefatos/api-server/dist/
 
 EXPOSE 3000
 
