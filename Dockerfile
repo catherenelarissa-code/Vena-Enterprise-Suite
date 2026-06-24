@@ -1,3 +1,5 @@
+# rebuild: 2026-06-24
+
 FROM node:20-alpine
 
 RUN npm install -g pnpm
