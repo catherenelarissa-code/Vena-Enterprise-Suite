@@ -10,7 +10,7 @@ RUN pnpm install --no-frozen-lockfile
 
 RUN cd artefatos/api-server && pnpm run build
 
-RUN ls -la /app/artefatos/api-server/ && ls -la /app/artefatos/api-server/dist/ || echo "DIST NAO EXISTE"
+RUN ls -la /app/artefatos/api-server/dist/
 
 EXPOSE 3000
 
