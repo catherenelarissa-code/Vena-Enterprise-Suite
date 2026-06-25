@@ -109,3 +109,70 @@ export function Fornecedores() {
                     <span className="truncate">{supplier.address || 'Não informado'}</span>
                   </div>
                 </div>
+</div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <div className="col-span-full py-12 text-center border rounded-lg bg-card text-muted-foreground">
+            Nenhum fornecedor encontrado. Clique em "Novo Fornecedor" para começar.
+          </div>
+        )}
+      </div>
+
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Novo Fornecedor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome *</Label>
+              <Input placeholder="Nome do fornecedor" value={name} onChange={e => setName(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Categoria *</Label>
+                <Input placeholder="Ex: Elétrico, EPI, Ferramentas" value={category} onChange={e => setCategory(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Contato principal *</Label>
+                <Input placeholder="Nome do contato" value={contact} onChange={e => setContact(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Telefone / WhatsApp</Label>
+                <Input placeholder="(00) 00000-0000" value={phone} onChange={e => setPhone(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input placeholder="email@fornecedor.com" value={email} onChange={e => setEmail(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>CNPJ</Label>
+                <Input placeholder="00.000.000/0000-00" value={cnpj} onChange={e => setCnpj(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Endereço</Label>
+                <Input placeholder="Cidade / Estado" value={address} onChange={e => setAddress(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Textarea placeholder="Produtos principais, condições de pagamento..." value={notes} onChange={e => setNotes(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={isPending}>
+              {isPending ? "Salvando..." : "Cadastrar Fornecedor"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
