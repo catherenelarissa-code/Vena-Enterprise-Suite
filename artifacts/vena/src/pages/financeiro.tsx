@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListFinancialAccounts, getListFinancialAccountsQueryKey, useCreateFinancialAccount, useUpdateFinancialAccount, useListSuppliers, useGetMonthlySummary } from "@workspace/api-client-react";
+import { useListFinancialAccounts, getListFinancialAccountsQueryKey, useCreateFinancialAccount, useUpdateFinancialAccount, useListSuppliers } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,6 @@ export function Financeiro() {
   const { data: payable, isLoading: isLoadingPayable } = useListFinancialAccounts({ type: "payable" }, { query: { queryKey: getListFinancialAccountsQueryKey({ type: "payable" }) } });
   const { data: receivable, isLoading: isLoadingReceivable } = useListFinancialAccounts({ type: "receivable" }, { query: { queryKey: getListFinancialAccountsQueryKey({ type: "receivable" }) } });
   const { data: suppliers } = useListSuppliers({}, {});
-  const { data: monthlySummary } = useGetMonthlySummary({});
   const { mutate: createAccount, isPending } = useCreateFinancialAccount();
   const { mutate: updateAccount } = useUpdateFinancialAccount();
 
@@ -135,23 +134,6 @@ export function Financeiro() {
         </Card>
       </div>
 
-      {monthlySummary && monthlySummary.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle>Fluxo de Caixa Mensal</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={monthlySummary}>
-                <XAxis dataKey="month" />
-                <YAxis tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: any) => formatCurrency(v)} />
-                <Legend />
-                <Bar dataKey="income" name="Receitas" fill="hsl(var(--secondary))" radius={[4,4,0,0]} />
-                <Bar dataKey="expenses" name="Despesas" fill="hsl(var(--destructive))" radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-[400px] grid-cols-2">
