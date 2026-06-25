@@ -2,6 +2,7 @@ export * from "./users";
 export * from "./suppliers";
 export * from "./projects";
 export * from "./materials";
+export * from "./material-movements";
 export * from "./purchases";
 export * from "./financial";
 export * from "./price-monitor";
