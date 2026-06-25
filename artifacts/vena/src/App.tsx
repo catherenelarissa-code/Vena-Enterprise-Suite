@@ -70,8 +70,18 @@ function Router() {
       <Route path="/compras">
         <SidebarLayout><Compras /></SidebarLayout>
       </Route>
+      <Route path="/compras/:id">
+        <SidebarLayout><ComprasDetail /></SidebarLayout>
+      </Route>
       <Route path="/fornecedores">
         <SidebarLayout><Fornecedores /></SidebarLayout>
+      </Route>
+      <Route path="/fornecedores/:id">
+        <SidebarLayout><FornecedorDetail /></SidebarLayout>
+      </Route>
+      <Route path="/obras/:id">
+        <SidebarLayout><ObraDetail /></SidebarLayout>
+      </Route>
       </Route>
       <Route path="/financeiro">
         <SidebarLayout><Financeiro /></SidebarLayout>
