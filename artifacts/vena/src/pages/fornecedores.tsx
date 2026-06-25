@@ -109,7 +109,20 @@ export function Fornecedores() {
                     <span className="truncate">{supplier.address || 'Não informado'}</span>
                   </div>
                 </div>
-</div>
+                <div className="mt-6 pt-4 border-t space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Preço</span>
+                    <StarRating rating={supplier.avgPriceScore ?? 0} />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Entrega</span>
+                    <StarRating rating={supplier.avgDeliveryScore ?? 0} />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Qualidade</span>
+                    <StarRating rating={supplier.avgQualityScore ?? 0} />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ))
