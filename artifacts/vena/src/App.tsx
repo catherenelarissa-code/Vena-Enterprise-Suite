@@ -82,7 +82,6 @@ function Router() {
       <Route path="/obras/:id">
         <SidebarLayout><ObraDetail /></SidebarLayout>
       </Route>
-      </Route>
       <Route path="/financeiro">
         <SidebarLayout><Financeiro /></SidebarLayout>
       </Route>
