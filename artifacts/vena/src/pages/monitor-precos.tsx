@@ -3,7 +3,7 @@ import {
   useListMonitoredProducts,
   useCreateMonitoredProduct,
   useDeleteMonitoredProduct,
-  useGetProductPriceHistory,
+  useListProductPriceHistory,
   getListMonitoredProductsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -143,7 +143,7 @@ function AddProductModal({ open, onClose }: { open: boolean; onClose: () => void
 // ── Gráfico de Histórico ─────────────────────────────────────────────────────
 
 function PriceChart({ productId }: { productId: number }) {
-  const { data: history, isLoading } = useGetProductPriceHistory(productId);
+  const { data: history, isLoading } = useListProductPriceHistory(productId);
 
   if (isLoading) return <Skeleton className="h-[120px] w-full" />;
   if (!history || history.length < 2) {
