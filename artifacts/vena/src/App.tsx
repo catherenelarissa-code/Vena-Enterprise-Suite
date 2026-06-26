@@ -1,3 +1,4 @@
+import { Automacao } from "@/pages/automacao";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -95,6 +96,9 @@ function Router() {
       <Route path="/monitor-precos">
         <SidebarLayout><MonitorPrecos /></SidebarLayout>
       </Route>
+      <Route path="/automacao">
+  <SidebarLayout><Automacao /></SidebarLayout>
+</Route>
       <Route path="/admin">
         <SidebarLayout><Admin /></SidebarLayout>
       </Route>
