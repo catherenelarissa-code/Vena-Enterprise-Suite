@@ -1,7 +1,3 @@
-// lib/db/src/schema/material-movements.ts
-// Adicione este arquivo em: lib/db/src/schema/material-movements.ts
-// E exporte-o em: lib/db/src/schema/index.ts
-
 import { pgTable, serial, integer, numeric, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { materialsTable } from "./materials";
 import { projectsTable } from "./projects";
