@@ -21,6 +21,7 @@ import { Fornecedores } from "@/pages/fornecedores";
 import { ComprasDetail } from "@/pages/compras-detail";
 import { FornecedorDetail } from "@/pages/fornecedor-detail";
 import { ObraDetail } from "@/pages/obra-detail";
+import { Automacao } from "@/pages/automacao";
 
 const queryClient = new QueryClient({
   defaultOptions: {
