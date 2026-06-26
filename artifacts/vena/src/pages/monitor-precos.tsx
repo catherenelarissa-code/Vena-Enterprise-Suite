@@ -1,6 +1,3 @@
-// artifacts/vena/src/pages/monitor-precos.tsx
-// Substitua o arquivo inteiro por este conteúdo
-
 import { useState } from "react";
 import {
   useListMonitoredProducts,
