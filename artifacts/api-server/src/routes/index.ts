@@ -8,6 +8,7 @@ import financialRouter from "./financial";
 import projectsRouter from "./projects";
 import materialsRouter from "./materials";
 import priceMonitorRouter from "./price-monitor";
+import automationRouter from "./automation";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use("/financial", financialRouter);
 router.use("/projects", projectsRouter);
 router.use("/materials", materialsRouter);
 router.use("/price-monitor", priceMonitorRouter);
+router.use("/automation", automationRouter);
 
 export default router;
