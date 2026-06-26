@@ -69,8 +69,16 @@ type ForecastItem = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// Monta a URL completa do backend (Railway), já que chamadas com caminho
+// relativo (ex: fetch("/api/...")) caem no domínio do Vercel, que não tem
+// proxy configurado para /api e não chegam ao backend.
+function apiUrl(path: string): string {
+  const base = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
+  return `${base}${path}`;
+}
+
 async function postMovement(materialId: number, payload: object) {
-  const res = await fetch(`/api/materials/${materialId}/movements`, {
+  const res = await fetch(apiUrl(`/api/materials/${materialId}/movements`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -84,7 +92,7 @@ async function postMovement(materialId: number, payload: object) {
 }
 
 async function fetchMovements(materialId: number): Promise<Movement[]> {
-  const res = await fetch(`/api/materials/${materialId}/movements`, { credentials: "include" });
+  const res = await fetch(apiUrl(`/api/materials/${materialId}/movements`), { credentials: "include" });
   if (!res.ok) throw new Error("Erro ao buscar histórico");
   return res.json();
 }
@@ -421,7 +429,7 @@ function ReposicaoAutomatica() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/materials/forecast", { credentials: "include" });
+      const res = await fetch(apiUrl("/api/materials/forecast"), { credentials: "include" });
       if (!res.ok) throw new Error("Falha ao buscar previsão");
       const data = await res.json();
       setItens(data);
@@ -440,7 +448,7 @@ function ReposicaoAutomatica() {
         Math.ceil(item.minimumStock * 0.5),
       );
 
-      const res = await fetch("/api/purchase-requests", {
+      const res = await fetch(apiUrl("/api/purchase-requests"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
