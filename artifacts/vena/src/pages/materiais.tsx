@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   useListMaterials,
   getListMaterialsQueryKey,
@@ -7,7 +7,7 @@ import {
   useListProjects,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +16,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
 import {
   Search, Plus, Filter, AlertCircle, Package,
-  Pencil, ArrowDown, ArrowUp, History, X,
-  Clock, ShoppingCart, Zap,
+  Pencil, ArrowDown, ArrowUp, History, X, Download,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
@@ -54,31 +53,10 @@ type Movement = {
   createdAt: string;
 };
 
-type ForecastItem = {
-  id: number;
-  name: string;
-  category: string;
-  unit: string;
-  currentStock: number;
-  minimumStock: number;
-  consumoMedioDiario: number;
-  diasRestantes: number | null;
-  critico: boolean;
-  lastPurchasePrice: number | null;
-};
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-// Monta a URL completa do backend (Railway), já que chamadas com caminho
-// relativo (ex: fetch("/api/...")) caem no domínio do Vercel, que não tem
-// proxy configurado para /api e não chegam ao backend.
-function apiUrl(path: string): string {
-  const base = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
-  return `${base}${path}`;
-}
-
 async function postMovement(materialId: number, payload: object) {
-  const res = await fetch(apiUrl(`/api/materials/${materialId}/movements`), {
+  const res = await fetch(`/api/materials/${materialId}/movements`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -92,7 +70,7 @@ async function postMovement(materialId: number, payload: object) {
 }
 
 async function fetchMovements(materialId: number): Promise<Movement[]> {
-  const res = await fetch(apiUrl(`/api/materials/${materialId}/movements`), { credentials: "include" });
+  const res = await fetch(`/api/materials/${materialId}/movements`, { credentials: "include" });
   if (!res.ok) throw new Error("Erro ao buscar histórico");
   return res.json();
 }
@@ -365,12 +343,12 @@ function HistoryModal({ material, onClose }: { material: Material; onClose: () =
   const [movements, setMovements] = useState<Movement[] | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  useState(() => {
     fetchMovements(material.id)
       .then(setMovements)
       .catch(() => toast.error("Erro ao carregar histórico."))
       .finally(() => setLoading(false));
-  }, [material.id]);
+  });
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -413,167 +391,47 @@ function HistoryModal({ material, onClose }: { material: Material; onClose: () =
   );
 }
 
-// ── Aba: Reposição Automática ────────────────────────────────────────────────
+// ── Página Principal ─────────────────────────────────────────────────────────
 
-function ReposicaoAutomatica() {
-  const [itens, setItens] = useState<ForecastItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [enviando, setEnviando] = useState<number | null>(null);
-
-  useEffect(() => {
-    carregarPrevisao();
-  }, []);
-
-  async function carregarPrevisao() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(apiUrl("/api/materials/forecast"), { credentials: "include" });
-      if (!res.ok) throw new Error("Falha ao buscar previsão");
-      const data = await res.json();
-      setItens(data);
-    } catch (err) {
-      setError("Não foi possível carregar a previsão de reposição.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function gerarSolicitacaoCompra(item: ForecastItem) {
-    setEnviando(item.id);
-    try {
-      const quantidadeSugerida = Math.max(
-        item.minimumStock - item.currentStock,
-        Math.ceil(item.minimumStock * 0.5),
-      );
-
-      const res = await fetch(apiUrl("/api/purchase-requests"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          title: `Reposição automática: ${item.name}`,
-          requestedBy: "Sistema (reposição automática)",
-          urgency: item.critico ? "urgent" : "normal",
-          notes: `Gerado automaticamente. Estoque atual: ${item.currentStock} ${item.unit}, mínimo: ${item.minimumStock} ${item.unit}, previsão de ${item.diasRestantes} dias até esgotar.`,
-          items: [
-            {
-              materialName: item.name,
-              quantity: quantidadeSugerida,
-              unit: item.unit,
-            },
-          ],
-        }),
-      });
-
-      if (!res.ok) throw new Error("Falha ao criar solicitação");
-
-      toast.success(`Solicitação de compra criada: ${quantidadeSugerida} ${item.unit} de ${item.name}`);
-    } catch (err) {
-      toast.error("Não foi possível criar a solicitação de compra.");
-    } finally {
-      setEnviando(null);
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Zap className="size-4 text-accent" /> Estoque mínimo inteligente
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Cálculo dinâmico com base no consumo médio real dos últimos 90 dias (movimentações de saída registradas). Materiais sem histórico suficiente não aparecem aqui.
-          </p>
-        </CardHeader>
-      </Card>
-
-      {error && (
-        <Card className="border-destructive/40">
-          <CardContent className="p-4 text-sm text-destructive flex items-center gap-2">
-            <AlertCircle className="size-4" /> {error}
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {loading ? (
-          Array(4).fill(0).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <Skeleton className="h-24 w-full" />
-              </CardContent>
-            </Card>
-          ))
-        ) : itens && itens.length > 0 ? (
-          itens.map((item) => {
-            const pct = Math.min((item.currentStock / item.minimumStock) * 100, 100);
-            return (
-              <Card key={item.id} className={item.critico ? "border-destructive/40" : ""}>
-                <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
-                  <div>
-                    <CardTitle className="text-base">{item.name}</CardTitle>
-                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="size-3.5" /> Com base no consumo médio, o estoque acaba em {item.diasRestantes} dias.
-                    </p>
-                  </div>
-                  <Badge className={item.critico ? "bg-destructive text-white" : "bg-amber-500 text-white"}>
-                    {item.diasRestantes} dias
-                  </Badge>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Estoque atual: {item.currentStock} {item.unit}</span>
-                      <span>Mínimo: {item.minimumStock} {item.unit}</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-secondary">
-                      <div
-                        className="h-2 rounded-full bg-primary"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg bg-secondary/50 p-3 text-xs text-muted-foreground">
-                    <p className="mb-1 font-medium text-foreground">Rascunho de solicitação de compra</p>
-                    <p>Consumo médio: {item.consumoMedioDiario} {item.unit}/dia</p>
-                    {item.lastPurchasePrice && (
-                      <p>Último preço pago: {formatCurrency(item.lastPurchasePrice)} / {item.unit}</p>
-                    )}
-                  </div>
-
-                  <Button
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    disabled={enviando === item.id}
-                    onClick={() => gerarSolicitacaoCompra(item)}
-                  >
-                    <ShoppingCart className="size-4" />
-                    {enviando === item.id ? "Enviando..." : "Aprovar auto-compra (1 clique)"}
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })
-        ) : (
-          <Card className="lg:col-span-2">
-            <CardContent className="p-8 text-center text-muted-foreground text-sm">
-              Nenhum material com histórico de consumo suficiente para gerar previsão ainda.
-              Registre algumas saídas de estoque para habilitar esta análise.
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Aba: Lista de Materiais (conteúdo original) ──────────────────────────────
-
-function ListaMateriais() {
+export function Materiais() {
   const [search, setSearch] = useState("");
+
+  function exportToExcel(mats: any[]) {
+    const data = mats.map((m) => ({
+      "Material": m.name,
+      "Categoria": m.category,
+      "Unidade": m.unit,
+      "Estoque Atual": m.currentStock,
+      "Estoque Minimo": m.minimumStock,
+      "Status": m.currentStock <= m.minimumStock ? "Baixo" : "Normal",
+      "Ultimo Preco (R$)": m.lastPurchasePrice ?? "",
+      "Obra Vinculada": m.projectName ?? "",
+      "Cadastrado em": new Date(m.createdAt).toLocaleDateString("pt-BR"),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = [
+      { wch: 35 }, { wch: 18 }, { wch: 10 }, { wch: 14 },
+      { wch: 14 }, { wch: 10 }, { wch: 16 }, { wch: 25 }, { wch: 14 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Estoque");
+
+    const lowStock = mats.filter((m) => m.currentStock <= m.minimumStock);
+    const summary = [
+      { "Informacao": "Total de materiais", "Valor": mats.length },
+      { "Informacao": "Materiais com estoque baixo", "Valor": lowStock.length },
+      { "Informacao": "Em estoque normal", "Valor": mats.length - lowStock.length },
+      { "Informacao": "Data de exportacao", "Valor": new Date().toLocaleDateString("pt-BR") },
+    ];
+    const wsSummary = XLSX.utils.json_to_sheet(summary);
+    wsSummary["!cols"] = [{ wch: 30 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo");
+
+    XLSX.writeFile(wb, `estoque_vena_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success("Planilha exportada com sucesso!");
+  }
   const [filterLow, setFilterLow] = useState(false);
   const [modalForm, setModalForm] = useState<{ open: boolean; editing: Material | null }>({ open: false, editing: null });
   const [modalMove, setModalMove] = useState<{ material: Material; type: "entrada" | "saida" } | null>(null);
@@ -591,7 +449,31 @@ function ListaMateriais() {
   const lowStockCount = materials?.filter((m) => m.currentStock <= m.minimumStock).length ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Materiais e Estoque</h2>
+          <p className="text-muted-foreground">Controle de insumos e alertas de reposição.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => materials && exportToExcel(materials)}
+            disabled={!materials || materials.length === 0}
+            className="shrink-0"
+          >
+            <Download className="mr-2 h-4 w-4" /> Exportar Excel
+          </Button>
+          <Button
+            onClick={() => setModalForm({ open: true, editing: null })}
+            className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="mr-2 h-4 w-4" /> Novo Material
+          </Button>
+        </div>
+      </div>
+
       {/* Alerta estoque baixo */}
       {lowStockCount > 0 && (
         <div className="flex items-center gap-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
@@ -743,51 +625,6 @@ function ListaMateriais() {
         <HistoryModal
           material={modalHistory}
           onClose={() => setModalHistory(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-// ── Página Principal ─────────────────────────────────────────────────────────
-
-export function Materiais() {
-  const [modalForm, setModalForm] = useState(false);
-
-  return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Materiais e Estoque</h2>
-          <p className="text-muted-foreground">Controle de insumos e alertas de reposição.</p>
-        </div>
-        <Button
-          onClick={() => setModalForm(true)}
-          className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="mr-2 h-4 w-4" /> Novo Material
-        </Button>
-      </div>
-
-      <Tabs defaultValue="lista">
-        <TabsList>
-          <TabsTrigger value="lista">Lista de Materiais</TabsTrigger>
-          <TabsTrigger value="reposicao">Reposição Automática</TabsTrigger>
-        </TabsList>
-        <TabsContent value="lista" className="mt-4">
-          <ListaMateriais />
-        </TabsContent>
-        <TabsContent value="reposicao" className="mt-4">
-          <ReposicaoAutomatica />
-        </TabsContent>
-      </Tabs>
-
-      {modalForm && (
-        <MaterialFormModal
-          open
-          editing={null}
-          onClose={() => setModalForm(false)}
         />
       )}
     </div>
