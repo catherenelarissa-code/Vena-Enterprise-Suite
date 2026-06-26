@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "./ui/button";
-import { ..., Bot } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Truck, DollarSign, HardHat, Package, TrendingDown, Users, LogOut, Menu, Bot } from "lucide-react";
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
