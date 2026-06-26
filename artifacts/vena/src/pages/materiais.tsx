@@ -15,14 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LayoutDashboard, ShoppingCart, Truck, DollarSign, HardHat, Package, TrendingDown, Users, LogOut, Menu, Bot } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
 import {
   Search, Plus, Filter, AlertCircle, Package,
   Pencil, ArrowDown, ArrowUp, History, X, Download,
 } from "lucide-react";
-import * as XLSX from "xlsx";
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
@@ -396,40 +395,31 @@ function HistoryModal({ material, onClose }: { material: Material; onClose: () =
 export function Materiais() {
   const [search, setSearch] = useState("");
 
-  function exportToExcel(mats: any[]) {
-    const data = mats.map((m) => ({
-      "Material": m.name,
-      "Categoria": m.category,
-      "Unidade": m.unit,
-      "Estoque Atual": m.currentStock,
-      "Estoque Minimo": m.minimumStock,
-      "Status": m.currentStock <= m.minimumStock ? "Baixo" : "Normal",
-      "Ultimo Preco (R$)": m.lastPurchasePrice ?? "",
-      "Obra Vinculada": m.projectName ?? "",
-      "Cadastrado em": new Date(m.createdAt).toLocaleDateString("pt-BR"),
-    }));
+  function exportToCSV(mats: any[]) {
+    const headers = ["Material","Categoria","Unidade","Estoque Atual","Estoque Minimo","Status","Ultimo Preco (R$)","Obra Vinculada","Cadastrado em"];
+    const rows = mats.map((m) => [
+      m.name,
+      m.category,
+      m.unit,
+      m.currentStock,
+      m.minimumStock,
+      m.currentStock <= m.minimumStock ? "Baixo" : "Normal",
+      m.lastPurchasePrice ?? "",
+      m.projectName ?? "",
+      new Date(m.createdAt).toLocaleDateString("pt-BR"),
+    ]);
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    ws["!cols"] = [
-      { wch: 35 }, { wch: 18 }, { wch: 10 }, { wch: 14 },
-      { wch: 14 }, { wch: 10 }, { wch: 16 }, { wch: 25 }, { wch: 14 },
-    ];
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
+      .join("\n");
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Estoque");
-
-    const lowStock = mats.filter((m) => m.currentStock <= m.minimumStock);
-    const summary = [
-      { "Informacao": "Total de materiais", "Valor": mats.length },
-      { "Informacao": "Materiais com estoque baixo", "Valor": lowStock.length },
-      { "Informacao": "Em estoque normal", "Valor": mats.length - lowStock.length },
-      { "Informacao": "Data de exportacao", "Valor": new Date().toLocaleDateString("pt-BR") },
-    ];
-    const wsSummary = XLSX.utils.json_to_sheet(summary);
-    wsSummary["!cols"] = [{ wch: 30 }, { wch: 20 }];
-    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo");
-
-    XLSX.writeFile(wb, `estoque_vena_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `estoque_vena_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
     toast.success("Planilha exportada com sucesso!");
   }
   const [filterLow, setFilterLow] = useState(false);
@@ -459,11 +449,11 @@ export function Materiais() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => materials && exportToExcel(materials)}
+            onClick={() => materials && exportToCSV(materials)}
             disabled={!materials || materials.length === 0}
             className="shrink-0"
           >
-            <Download className="mr-2 h-4 w-4" /> Exportar Excel
+            <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
           <Button
             onClick={() => setModalForm({ open: true, editing: null })}
