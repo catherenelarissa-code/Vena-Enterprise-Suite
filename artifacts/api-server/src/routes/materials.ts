@@ -1,10 +1,7 @@
-// artifacts/api-server/src/routes/materials.ts
-// Substitua o arquivo inteiro por este conteúdo
-
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { materialsTable, projectsTable, materialMovementsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, gte, and } from "drizzle-orm";
 
 const router = Router();
 
@@ -202,7 +199,6 @@ router.post("/:id/movements", async (req, res) => {
   }
 });
 
-// GET /:id/movements - Histórico de movimentações
 router.get("/:id/movements", async (req, res) => {
   try {
     const materialId = parseInt(req.params.id);
@@ -232,4 +228,80 @@ router.get("/:id/movements", async (req, res) => {
   }
 });
 
+// artifacts/api-server/src/routes/materials.ts
+// Adicione esta rota nova dentro do arquivo materials.ts (antes do "export default router;")
+// Não precisa criar arquivo novo - é só inserir este bloco no arquivo existente.
+
+// Necessário adicionar "gte" e "and" no import do drizzle-orm no topo do arquivo:
+// import { eq, desc, gte, and } from "drizzle-orm";
+
+// GET /forecast - Previsão de reposição (consumo médio + dias até acabar)
+router.get("/forecast", async (req, res) => {
+  try {
+    const DAYS_WINDOW = 90; // janela de histórico usada para calcular consumo médio
+    const since = new Date();
+    since.setDate(since.getDate() - DAYS_WINDOW);
+
+    const materials = await db.select().from(materialsTable);
+
+    const result = await Promise.all(materials.map(async (m) => {
+      const currentStock = parseFloat(m.currentStock);
+      const minimumStock = parseFloat(m.minimumStock);
+
+      // Busca saídas (consumo) dos últimos 90 dias para este material
+      const saidas = await db
+        .select()
+        .from(materialMovementsTable)
+        .where(and(
+          eq(materialMovementsTable.materialId, m.id),
+          eq(materialMovementsTable.type, "saida"),
+          gte(materialMovementsTable.createdAt, since),
+        ));
+
+      const totalConsumido = saidas.reduce((sum, mov) => sum + parseFloat(mov.quantity), 0);
+
+      // Quantos dias de histórico realmente existem (não assume 90 cheios se o material é novo)
+      let diasComHistorico = DAYS_WINDOW;
+      if (saidas.length > 0) {
+        const datas = saidas.map(s => s.createdAt.getTime());
+        const primeiraData = Math.min(...datas);
+        const diasDesdeOInicio = Math.ceil((Date.now() - primeiraData) / (1000 * 60 * 60 * 24));
+        diasComHistorico = Math.max(diasDesdeOInicio, 1);
+      }
+
+      const consumoMedioDiario = saidas.length > 0 ? totalConsumido / diasComHistorico : 0;
+
+      // Sem histórico de consumo suficiente para prever -> não entra na lista de previsão
+      const temHistoricoSuficiente = saidas.length >= 2 && consumoMedioDiario > 0;
+
+      const diasRestantes = temHistoricoSuficiente
+        ? Math.floor(currentStock / consumoMedioDiario)
+        : null;
+
+      return {
+        id: m.id,
+        name: m.name,
+        category: m.category,
+        unit: m.unit,
+        currentStock,
+        minimumStock,
+        consumoMedioDiario: Math.round(consumoMedioDiario * 1000) / 1000,
+        diasRestantes,
+        critico: diasRestantes !== null && diasRestantes <= 15,
+        temHistoricoSuficiente,
+        lastPurchasePrice: m.lastPurchasePrice ? parseFloat(m.lastPurchasePrice) : null,
+      };
+    }));
+
+    // Só retorna materiais com previsão calculável, ordenados pelos mais urgentes primeiro
+    const comPrevisao = result
+      .filter(r => r.temHistoricoSuficiente)
+      .sort((a, b) => (a.diasRestantes ?? 0) - (b.diasRestantes ?? 0));
+
+    return res.json(comPrevisao);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao calcular previsão de reposição" });
+  }
+});
 export default router;
