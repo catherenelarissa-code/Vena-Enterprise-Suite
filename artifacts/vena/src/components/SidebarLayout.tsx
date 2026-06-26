@@ -10,12 +10,12 @@ import {
   TrendingDown, 
   Users, 
   LogOut,
-  Menu
+  Menu,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "./ui/button";
-import { LayoutDashboard, ShoppingCart, Truck, DollarSign, HardHat, Package, TrendingDown, Users, LogOut, Menu, Bot } from "lucide-react";
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
@@ -50,7 +50,6 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Mobile sidebar backdrop */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black/50 md:hidden" 
@@ -58,7 +57,6 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
         />
       )}
 
-      {/* Sidebar */}
       <aside 
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground transition-transform duration-200 ease-in-out md:static md:translate-x-0 flex flex-col",
@@ -110,9 +108,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex flex-1 flex-col overflow-hidden">
-        {/* Mobile header */}
         <header className="flex h-16 shrink-0 items-center border-b bg-card px-6 md:hidden">
           <Button variant="ghost" size="icon" onClick={toggleMobileMenu} className="-ml-2 mr-2">
             <Menu className="h-5 w-5" />
