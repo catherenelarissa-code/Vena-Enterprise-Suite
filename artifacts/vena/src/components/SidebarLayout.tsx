@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "./ui/button";
+import { ..., Bot } from "lucide-react";
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
@@ -41,6 +42,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
     { name: "Obras", href: "/obras", icon: HardHat },
     { name: "Materiais", href: "/materiais", icon: Package },
     { name: "Monitor de Preços", href: "/monitor-precos", icon: TrendingDown },
+    { name: "Automação", href: "/automacao", icon: Bot },
     ...(user?.role === "admin" ? [{ name: "Admin", href: "/admin", icon: Users }] : []),
   ];
 
