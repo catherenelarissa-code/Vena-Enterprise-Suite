@@ -67,18 +67,21 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
        {/* Logo */}
 <div className="flex h-16 shrink-0 items-center px-5 border-b border-white/5">
-  <div className="flex items-center gap-3">
-    <svg width="38" height="38" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Paralelogramo de cima (esquerda) */}
-      <path d="M10 25 L45 10 L60 40 L25 55 Z" fill="#F97316"/>
-      {/* Paralelogramo de baixo (direita) */}
-      <path d="M40 60 L75 45 L90 75 L55 90 Z" fill="#F97316"/>
-      {/* Recorte branco/escuro no centro para criar o efeito de entrelaçado */}
-      <path d="M40 40 L60 40 L60 60 L40 60 Z" fill="#0f1a12"/>
+  <div className="flex items-center gap-2">
+    <svg width="40" height="48" viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Paralelogramo superior */}
+      <path d="M15 5 L65 5 Q75 5 75 15 L75 55 Q75 65 65 65 L15 65 Q5 65 5 55 L5 15 Q5 5 15 5 Z" 
+        transform="skewX(-10)" fill="#F97316"/>
+      {/* Paralelogramo inferior */}
+      <path d="M35 55 L85 55 Q95 55 95 65 L95 105 Q95 115 85 115 L35 115 Q25 115 25 105 L25 65 Q25 55 35 55 Z" 
+        transform="skewX(-10)" fill="#F97316"/>
+      {/* Recorte branco do entrelaçado */}
+      <path d="M38 52 L62 52 L62 68 L38 68 Z" 
+        transform="skewX(-10)" fill="#0f1a12"/>
     </svg>
-    <div className="flex flex-col leading-tight">
-      <span className="text-lg font-bold tracking-tight text-white">vena</span>
-      <span className="text-[10px] font-medium text-green-500 tracking-widest uppercase">engenharia</span>
+    <div className="flex flex-col leading-none">
+      <span className="text-xl font-bold tracking-tight text-white" style={{fontFamily: 'Inter, sans-serif'}}>vena</span>
+      <span className="text-[11px] text-green-500 tracking-wider" style={{fontWeight: 300}}>engenharia</span>
     </div>
   </div>
 </div>
