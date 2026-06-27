@@ -70,8 +70,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   <img 
     src="/png_vena.png" 
     alt="Vena Engenharia" 
-    className="h-10 w-auto object-contain brightness-0 invert"
-    style={{ filter: 'brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(340deg)' }}
+    className="h-10 w-auto object-contain"
   />
 </div>
 
