@@ -1,6 +1,3 @@
-// artifacts/api-server/src/routes/price-monitor.ts
-// Substitua o arquivo inteiro por este conteúdo
-
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
