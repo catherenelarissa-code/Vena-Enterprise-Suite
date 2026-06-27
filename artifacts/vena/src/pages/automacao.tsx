@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  Plus, Pencil, Trash2, Copy, Check, Upload, Sparkles,
+  Plus, Pencil, Trash2, Copy, Check,
   MessageSquare, FileText, X, ChevronRight, Tag, PenLine,
 } from "lucide-react";
 
@@ -20,13 +20,13 @@ type Template = {
   name: string;
   description?: string;
   template: string;
-  label?: string;       // ← etiqueta/categoria
+  label?: string;
   createdAt: string;
 };
 
 type ExtractedFields = Record<string, string | null>;
 
-// ── Etiquetas disponíveis ─────────────────────────────────────────────────────
+// ── Etiquetas ─────────────────────────────────────────────────────────────────
 
 const LABEL_OPTIONS = [
   { value: "procuracao", label: "Procurações", color: "bg-purple-100 text-purple-700 border-purple-300" },
@@ -69,26 +69,9 @@ async function apiCall(path: string, options?: RequestInit) {
   return res.status === 204 ? null : res.json();
 }
 
-function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const base64 = result.split(",")[1];
-      resolve({ base64, mediaType: file.type });
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+// ── Caixinha de Variáveis ─────────────────────────────────────────────────────
 
-// ── Caixinha de Variáveis com scroll, adicionar e editar ──────────────────────
-
-function VariablesBox({
-  onInsert,
-}: {
-  onInsert: (v: string) => void;
-}) {
+function VariablesBox({ onInsert }: { onInsert: (v: string) => void }) {
   const DEFAULT_VARS = [
     "NOME_CLIENTE", "VALOR", "DATA", "POTENCIA", "PAGAMENTO",
     "ENDERECO", "CPF_CNPJ", "UNIDADE", "NUMERO_PEDIDO",
@@ -116,10 +99,7 @@ function VariablesBox({
 
   function addVar() {
     const cleaned = newVar.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
-    if (!cleaned || vars.includes(cleaned)) {
-      toast.error("Nome inválido ou já existe.");
-      return;
-    }
+    if (!cleaned || vars.includes(cleaned)) { toast.error("Nome inválido ou já existe."); return; }
     setVars([...vars, cleaned]);
     setNewVar("");
     setShowAdd(false);
@@ -131,21 +111,13 @@ function VariablesBox({
 
   return (
     <div className="border rounded-lg bg-muted/30">
-      {/* header da caixinha */}
       <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40 rounded-t-lg">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          Variáveis disponíveis
-        </span>
-        <button
-          type="button"
-          onClick={() => setShowAdd((v) => !v)}
-          className="text-xs flex items-center gap-1 text-primary hover:underline"
-        >
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Variáveis disponíveis</span>
+        <button type="button" onClick={() => setShowAdd((v) => !v)} className="text-xs flex items-center gap-1 text-primary hover:underline">
           <Plus className="h-3 w-3" /> Adicionar
         </button>
       </div>
 
-      {/* campo para nova variável */}
       {showAdd && (
         <div className="flex gap-2 px-3 py-2 border-b bg-background">
           <Input
@@ -163,13 +135,9 @@ function VariablesBox({
         </div>
       )}
 
-      {/* lista com scroll */}
       <div className="max-h-44 overflow-y-auto divide-y">
         {vars.map((v, idx) => (
-          <div
-            key={v}
-            className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/50 group"
-          >
+          <div key={v} className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/50 group">
             {editingIdx === idx ? (
               <>
                 <Input
@@ -179,42 +147,22 @@ function VariablesBox({
                   onKeyDown={(e) => e.key === "Enter" && confirmEdit(idx)}
                   autoFocus
                 />
-                <button
-                  type="button"
-                  onClick={() => confirmEdit(idx)}
-                  className="text-primary hover:text-primary/80"
-                >
+                <button type="button" onClick={() => confirmEdit(idx)} className="text-primary hover:text-primary/80">
                   <Check className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingIdx(null)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
+                <button type="button" onClick={() => setEditingIdx(null)} className="text-muted-foreground hover:text-foreground">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </>
             ) : (
               <>
-                <button
-                  type="button"
-                  onClick={() => onInsert(v)}
-                  className="flex-1 text-left text-xs font-mono text-primary hover:underline"
-                >
+                <button type="button" onClick={() => onInsert(v)} className="flex-1 text-left text-xs font-mono text-primary hover:underline">
                   {`{${v}}`}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => startEdit(idx)}
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
-                >
+                <button type="button" onClick={() => startEdit(idx)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity">
                   <PenLine className="h-3 w-3" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => removeVar(idx)}
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                >
+                <button type="button" onClick={() => removeVar(idx)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
                   <X className="h-3 w-3" />
                 </button>
               </>
@@ -232,17 +180,9 @@ function VariablesBox({
   );
 }
 
-// ── Modal: Criar/Editar Template ─────────────────────────────────────────────
+// ── Modal Criar/Editar ────────────────────────────────────────────────────────
 
-function TemplateModal({
-  editing,
-  onClose,
-  onSaved,
-}: {
-  editing: Template | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
+function TemplateModal({ editing, onClose, onSaved }: { editing: Template | null; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
     name: editing?.name ?? "",
     description: editing?.description ?? "",
@@ -250,11 +190,9 @@ function TemplateModal({
     label: editing?.label ?? "",
   });
   const [isPending, setIsPending] = useState(false);
-
-  const variables = extractVariables(form.template);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const variables = extractVariables(form.template);
 
-  // Insere variável na posição do cursor
   function insertVariable(v: string) {
     const el = textareaRef.current;
     if (el) {
@@ -263,11 +201,7 @@ function TemplateModal({
       const inserted = `{${v}}`;
       const newVal = form.template.slice(0, start) + inserted + form.template.slice(end);
       setForm((f) => ({ ...f, template: newVal }));
-      // Reposiciona cursor após inserção
-      setTimeout(() => {
-        el.focus();
-        el.setSelectionRange(start + inserted.length, start + inserted.length);
-      }, 0);
+      setTimeout(() => { el.focus(); el.setSelectionRange(start + inserted.length, start + inserted.length); }, 0);
     } else {
       setForm((f) => ({ ...f, template: f.template + `{${v}}` }));
     }
@@ -281,16 +215,10 @@ function TemplateModal({
     setIsPending(true);
     try {
       if (editing) {
-        await apiCall(`/templates/${editing.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(form),
-        });
+        await apiCall(`/templates/${editing.id}`, { method: "PATCH", body: JSON.stringify(form) });
         toast.success("Modelo atualizado!");
       } else {
-        await apiCall("/templates", {
-          method: "POST",
-          body: JSON.stringify(form),
-        });
+        await apiCall("/templates", { method: "POST", body: JSON.stringify(form) });
         toast.success("Modelo criado!");
       }
       onSaved();
@@ -308,41 +236,26 @@ function TemplateModal({
         <DialogHeader>
           <DialogTitle>{editing ? "Editar Modelo" : "Novo Modelo de Mensagem"}</DialogTitle>
         </DialogHeader>
-
         <div className="space-y-4 py-2">
-          {/* Nome + Descrição */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Nome do modelo *</Label>
-              <Input
-                placeholder="Ex: Proposta Solar"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
+              <Input placeholder="Ex: Proposta Solar" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Descrição</Label>
-              <Input
-                placeholder="Ex: Envio de proposta para cliente"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
+              <Input placeholder="Ex: Envio de proposta para cliente" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
           </div>
 
-          {/* Etiqueta */}
           <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5">
-              <Tag className="h-3.5 w-3.5" /> Etiqueta / Categoria
-            </Label>
+            <Label className="flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> Etiqueta / Categoria</Label>
             <div className="flex flex-wrap gap-2">
               {LABEL_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() =>
-                    setForm((f) => ({ ...f, label: f.label === opt.value ? "" : opt.value }))
-                  }
+                  onClick={() => setForm((f) => ({ ...f, label: f.label === opt.value ? "" : opt.value }))}
                   className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
                     form.label === opt.value
                       ? opt.color + " ring-2 ring-offset-1 ring-current"
@@ -355,13 +268,11 @@ function TemplateModal({
             </div>
           </div>
 
-          {/* Variáveis — caixinha com scroll */}
           <div className="space-y-1.5">
             <Label>Variáveis disponíveis</Label>
             <VariablesBox onInsert={insertVariable} />
           </div>
 
-          {/* Modelo da mensagem */}
           <div className="space-y-1.5">
             <Label>Modelo da mensagem *</Label>
             <Textarea
@@ -374,7 +285,6 @@ function TemplateModal({
             />
           </div>
 
-          {/* Variáveis detectadas */}
           {variables.length > 0 && (
             <div className="p-3 rounded-lg bg-muted/50 space-y-1">
               <p className="text-xs font-medium text-muted-foreground">Variáveis detectadas neste modelo:</p>
@@ -386,11 +296,8 @@ function TemplateModal({
             </div>
           )}
         </div>
-
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isPending}>
-            Cancelar
-          </Button>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>Cancelar</Button>
           <Button onClick={handleSave} disabled={isPending}>
             {isPending ? "Salvando..." : "Salvar"}
           </Button>
@@ -400,66 +307,19 @@ function TemplateModal({
   );
 }
 
-// ── Painel de Uso: OCR + Preenchimento ───────────────────────────────────────
+// ── Painel Usar Modelo ────────────────────────────────────────────────────────
 
-function UseTemplatePanel({
-  template,
-  onClose,
-}: {
-  template: Template;
-  onClose: () => void;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
+function UseTemplatePanel({ template, onClose }: { template: Template; onClose: () => void }) {
   const [fields, setFields] = useState<ExtractedFields>(() => {
     const vars = extractVariables(template.template);
     return Object.fromEntries(vars.map((v) => [v, ""]));
   });
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isOcr, setIsOcr] = useState(false);
-  const [ocrSummary, setOcrSummary] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const variables = extractVariables(template.template);
   const preview = applyFields(template.template, fields);
   const hasUnfilled = variables.some((v) => !fields[v]);
   const labelInfo = getLabelInfo(template.label);
-
-  async function handleImage(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Por favor envie uma imagem (JPG, PNG, etc).");
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
-    setIsOcr(true);
-    setOcrSummary(null);
-
-    try {
-      const { base64, mediaType } = await fileToBase64(file);
-      const result = await apiCall("/ocr", {
-        method: "POST",
-        body: JSON.stringify({ imageBase64: base64, mediaType, templateFields: variables }),
-      });
-
-      const extracted: ExtractedFields = {};
-      for (const v of variables) {
-        extracted[v] = result.campos?.[v] ?? result.campos?.OUTROS?.[v] ?? "";
-      }
-      setFields((prev) => ({ ...prev, ...extracted }));
-      setOcrSummary(result.resumo ?? null);
-      toast.success("Dados extraídos com sucesso!");
-    } catch (err: any) {
-      toast.error(err.message ?? "Erro ao processar imagem.");
-    } finally {
-      setIsOcr(false);
-    }
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) handleImage(file);
-  }
 
   async function handleCopy() {
     await navigator.clipboard.writeText(preview);
@@ -470,7 +330,7 @@ function UseTemplatePanel({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-background rounded-xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+      <div className="bg-background rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-3">
             <div>
@@ -482,75 +342,33 @@ function UseTemplatePanel({
                   </span>
                 )}
               </div>
-              {template.description && (
-                <p className="text-sm text-muted-foreground">{template.description}</p>
-              )}
+              {template.description && <p className="text-sm text-muted-foreground">{template.description}</p>}
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           <div className="grid md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x">
-            <div className="p-5 space-y-5">
-              <div>
-                <Label className="mb-2 block">Documento / Imagem para OCR</Label>
-                <div
-                  className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors relative"
-                  onClick={() => fileRef.current?.click()}
-                  onDrop={handleDrop}
-                  onDragOver={(e) => e.preventDefault()}
-                >
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && handleImage(e.target.files[0])}
+            {/* Campos */}
+            <div className="p-5 space-y-3">
+              <Label>Preencha os campos</Label>
+              {variables.length === 0 && (
+                <p className="text-sm text-muted-foreground">Este modelo não possui variáveis.</p>
+              )}
+              {variables.map((v) => (
+                <div key={v} className="space-y-1">
+                  <Label className="text-xs font-mono text-muted-foreground">{`{${v}}`}</Label>
+                  <Input
+                    placeholder={`Valor para ${v}`}
+                    value={fields[v] ?? ""}
+                    onChange={(e) => setFields((f) => ({ ...f, [v]: e.target.value }))}
                   />
-                  {isOcr ? (
-                    <div className="flex flex-col items-center gap-2 py-2">
-                      <Sparkles className="h-6 w-6 text-primary animate-pulse" />
-                      <p className="text-sm font-medium">Analisando imagem com IA...</p>
-                    </div>
-                  ) : imagePreview ? (
-                    <div className="space-y-2">
-                      <img src={imagePreview} alt="Preview" className="max-h-32 mx-auto rounded object-contain" />
-                      <p className="text-xs text-muted-foreground">Clique para trocar a imagem</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 py-4">
-                      <Upload className="h-8 w-8 text-muted-foreground" />
-                      <p className="text-sm font-medium">Arraste ou clique para enviar</p>
-                      <p className="text-xs text-muted-foreground">Proposta, ficha, orçamento, documento...</p>
-                    </div>
-                  )}
                 </div>
-                {ocrSummary && (
-                  <div className="mt-2 p-2.5 rounded-lg bg-primary/5 border border-primary/20 flex gap-2 text-xs">
-                    <Sparkles className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-                    <span className="text-muted-foreground">{ocrSummary}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                <Label>Preencha os campos</Label>
-                {variables.map((v) => (
-                  <div key={v} className="space-y-1">
-                    <Label className="text-xs font-mono text-muted-foreground">{`{${v}}`}</Label>
-                    <Input
-                      placeholder={`Valor para ${v}`}
-                      value={fields[v] ?? ""}
-                      onChange={(e) => setFields((f) => ({ ...f, [v]: e.target.value }))}
-                    />
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
 
+            {/* Preview */}
             <div className="p-5 space-y-4 flex flex-col">
               <div className="flex items-center justify-between">
                 <Label>Prévia da mensagem</Label>
@@ -564,11 +382,7 @@ function UseTemplatePanel({
                 {preview || <span className="text-muted-foreground italic">A mensagem aparecerá aqui...</span>}
               </div>
               <Button onClick={handleCopy} size="lg" className="w-full gap-2" disabled={!preview}>
-                {copied ? (
-                  <><Check className="h-4 w-4" /> Copiado!</>
-                ) : (
-                  <><Copy className="h-4 w-4" /> Copiar para WhatsApp</>
-                )}
+                {copied ? <><Check className="h-4 w-4" /> Copiado!</> : <><Copy className="h-4 w-4" /> Copiar para WhatsApp</>}
               </Button>
             </div>
           </div>
@@ -578,22 +392,16 @@ function UseTemplatePanel({
   );
 }
 
-// ── Página Principal ─────────────────────────────────────────────────────────
+// ── Página Principal ──────────────────────────────────────────────────────────
 
 export function Automacao() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [modalForm, setModalForm] = useState<{ open: boolean; editing: Template | null }>({
-    open: false,
-    editing: null,
-  });
+  const [modalForm, setModalForm] = useState<{ open: boolean; editing: Template | null }>({ open: false, editing: null });
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
-  const [filterLabel, setFilterLabel] = useState<string>("");   // ← filtro por etiqueta
+  const [filterLabel, setFilterLabel] = useState<string>("");
 
-  // ✅ CORREÇÃO: useEffect no lugar de useState para carregar templates
-  useEffect(() => {
-    loadTemplates();
-  }, []);
+  useEffect(() => { loadTemplates(); }, []);
 
   async function loadTemplates() {
     try {
@@ -616,24 +424,16 @@ export function Automacao() {
     }
   }
 
-  const filtered = filterLabel
-    ? templates.filter((t) => t.label === filterLabel)
-    : templates;
+  const filtered = filterLabel ? templates.filter((t) => t.label === filterLabel) : templates;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Automação de Mensagens</h2>
-          <p className="text-muted-foreground">
-            Modelos inteligentes com leitura automática de documentos por IA.
-          </p>
+          <p className="text-muted-foreground">Modelos inteligentes para envio rápido de mensagens.</p>
         </div>
-        <Button
-          onClick={() => setModalForm({ open: true, editing: null })}
-          className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
-        >
+        <Button onClick={() => setModalForm({ open: true, editing: null })} className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90">
           <Plus className="mr-2 h-4 w-4" /> Novo Modelo
         </Button>
       </div>
@@ -641,16 +441,12 @@ export function Automacao() {
       {/* Filtro por etiqueta */}
       {templates.length > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <Tag className="h-3.5 w-3.5" /> Filtrar:
-          </span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Filtrar:</span>
           <button
             type="button"
             onClick={() => setFilterLabel("")}
             className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
-              filterLabel === ""
-                ? "bg-foreground text-background border-foreground"
-                : "bg-background text-muted-foreground border-border hover:border-primary/40"
+              filterLabel === "" ? "bg-foreground text-background border-foreground" : "bg-background text-muted-foreground border-border hover:border-primary/40"
             }`}
           >
             Todos
@@ -690,7 +486,7 @@ export function Automacao() {
           {!filterLabel && (
             <>
               <p className="text-sm text-muted-foreground mt-1 mb-4">
-                Crie modelos de mensagem com campos variáveis que serão preenchidos automaticamente por IA.
+                Crie modelos de mensagem com campos variáveis para envio rápido.
               </p>
               <Button onClick={() => setModalForm({ open: true, editing: null })}>
                 <Plus className="mr-2 h-4 w-4" /> Criar primeiro modelo
@@ -716,21 +512,13 @@ export function Automacao() {
                           </span>
                         )}
                       </div>
-                      {t.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.description}</p>
-                      )}
+                      {t.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.description}</p>}
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <Button
-                        variant="ghost" size="icon" className="h-7 w-7"
-                        onClick={() => setModalForm({ open: true, editing: t })}
-                      >
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModalForm({ open: true, editing: t })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive"
-                        onClick={() => handleDelete(t.id)}
-                      >
+                      <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => handleDelete(t.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -743,19 +531,13 @@ export function Automacao() {
                   {vars.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {vars.slice(0, 4).map((v) => (
-                        <Badge key={v} variant="outline" className="text-xs font-mono px-1.5">
-                          {`{${v}}`}
-                        </Badge>
+                        <Badge key={v} variant="outline" className="text-xs font-mono px-1.5">{`{${v}}`}</Badge>
                       ))}
-                      {vars.length > 4 && (
-                        <Badge variant="outline" className="text-xs">+{vars.length - 4}</Badge>
-                      )}
+                      {vars.length > 4 && <Badge variant="outline" className="text-xs">+{vars.length - 4}</Badge>}
                     </div>
                   )}
                   <Button className="w-full gap-2 mt-auto" onClick={() => setActiveTemplate(t)}>
-                    <FileText className="h-4 w-4" />
-                    Usar modelo
-                    <ChevronRight className="h-4 w-4 ml-auto" />
+                    <FileText className="h-4 w-4" /> Usar modelo <ChevronRight className="h-4 w-4 ml-auto" />
                   </Button>
                 </CardContent>
               </Card>
@@ -764,7 +546,6 @@ export function Automacao() {
         </div>
       )}
 
-      {/* Modais */}
       {modalForm.open && (
         <TemplateModal
           editing={modalForm.editing}
@@ -773,10 +554,7 @@ export function Automacao() {
         />
       )}
       {activeTemplate && (
-        <UseTemplatePanel
-          template={activeTemplate}
-          onClose={() => setActiveTemplate(null)}
-        />
+        <UseTemplatePanel template={activeTemplate} onClose={() => setActiveTemplate(null)} />
       )}
     </div>
   );
