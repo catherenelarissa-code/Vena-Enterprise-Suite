@@ -1,6 +1,10 @@
 import { useState, useRef } from "react";
 import { useParams, Link } from "wouter";
-import { useGetPurchaseRequest, getGetPurchaseRequestQueryKey, useCompareQuotes, getCompareQuotesQueryKey, useCreateQuote, useApproveQuote, useListSuppliers } from "@workspace/api-client-react";
+import {
+  useGetPurchaseRequest, getGetPurchaseRequestQueryKey,
+  useCompareQuotes, getCompareQuotesQueryKey,
+  useCreateQuote, useApproveQuote, useListSuppliers,
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,65 +15,62 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ArrowLeft, FileText, Package, AlertCircle, Building2, User, Clock, Sparkles, Plus, Upload, X } from "lucide-react";
+import {
+  ArrowLeft, FileText, Package, AlertCircle, Building2, User,
+  Clock, Sparkles, Plus, Upload, X, Tag, Percent, AlertTriangle, CheckCircle2,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-// ── Helpers OCR ──────────────────────────────────────────────────────────────
+// ── Compressão de imagem ──────────────────────────────────────────────────────
 
-function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }> {
+async function compressAndEncode(file: File): Promise<{ base64: string; mediaType: string }> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve({ base64: result.split(",")[1], mediaType: file.type });
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1200;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        const ratio = Math.min(MAX / width, MAX / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      resolve({ base64: canvas.toDataURL("image/jpeg", 0.75).split(",")[1], mediaType: "image/jpeg" });
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    img.onerror = reject;
+    img.src = url;
   });
 }
 
-async function ocrQuote(
-  file: File,
-  itemNames: string[]
-): Promise<{ prices: Record<string, string>; supplierName?: string; deliveryDays?: string; freightCost?: string; notes?: string }> {
-  const { base64, mediaType } = await fileToBase64(file);
-  const res = await fetch("/api/automation/ocr-quote", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imageBase64: base64, mediaType, itemNames }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Erro desconhecido" }));
-    throw new Error(err.error ?? "Erro ao processar imagem");
-  }
-  return res.json();
-}
+// ── OCR Upload para cotação ───────────────────────────────────────────────────
 
-// ── Componente OCR Upload ────────────────────────────────────────────────────
-
-function OcrUpload({
-  itemNames,
-  onExtracted,
-}: {
+function OcrQuoteUpload({ itemNames, onExtracted }: {
   itemNames: string[];
-  onExtracted: (data: { prices: Record<string, string>; supplierName?: string; deliveryDays?: string; freightCost?: string; notes?: string }) => void;
+  onExtracted: (data: any) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleFile(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Envie uma imagem (JPG, PNG, etc).");
-      return;
-    }
+    if (!file.type.startsWith("image/")) { toast.error("Envie uma imagem."); return; }
     setPreview(URL.createObjectURL(file));
     setIsLoading(true);
     try {
-      const result = await ocrQuote(file, itemNames);
-      onExtracted(result);
+      const { base64, mediaType } = await compressAndEncode(file);
+      const res = await fetch("/api/automation/ocr-quote", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mediaType, itemNames }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? "Erro"); }
+      const data = await res.json();
+      onExtracted(data);
       toast.success("Orçamento lido com sucesso!");
     } catch (err: any) {
       toast.error(err.message ?? "Erro ao ler orçamento.");
@@ -82,39 +83,29 @@ function OcrUpload({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label>Ler orçamento por imagem (IA)</Label>
-        {preview && (
-          <button
-            type="button"
-            onClick={() => { setPreview(null); }}
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-          >
+        {preview && !isLoading && (
+          <button type="button" onClick={() => setPreview(null)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
             <X className="h-3 w-3" /> Remover
           </button>
         )}
       </div>
       <div
         className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
-        onClick={() => fileRef.current?.click()}
+        onClick={() => !isLoading && fileRef.current?.click()}
         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
         onDragOver={(e) => e.preventDefault()}
       >
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-        />
+        <input ref={fileRef} type="file" accept="image/*" className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         {isLoading ? (
           <div className="flex flex-col items-center gap-2 py-2">
             <Sparkles className="h-5 w-5 text-primary animate-pulse" />
             <p className="text-sm font-medium">Lendo orçamento com IA...</p>
-            <p className="text-xs text-muted-foreground">Extraindo preços e informações...</p>
           </div>
         ) : preview ? (
           <div className="space-y-1">
             <img src={preview} alt="Orçamento" className="max-h-28 mx-auto rounded object-contain" />
-            <p className="text-xs text-muted-foreground">Clique para trocar a imagem</p>
+            <p className="text-xs text-muted-foreground">Clique para trocar</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 py-3">
@@ -128,7 +119,31 @@ function OcrUpload({
   );
 }
 
-// ── Página Principal ─────────────────────────────────────────────────────────
+// ── Badge de estoque ──────────────────────────────────────────────────────────
+
+function StockBadge({ materialName, materials }: { materialName: string; materials: any[] }) {
+  const match = materials.find(m =>
+    m.name.toLowerCase().includes(materialName.toLowerCase()) ||
+    materialName.toLowerCase().includes(m.name.toLowerCase())
+  );
+  if (!match) return null;
+  const stock = parseFloat(match.currentStock ?? "0");
+  const min = parseFloat(match.minimumStock ?? "0");
+  if (stock > min) {
+    return (
+      <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+        <CheckCircle2 className="h-3 w-3" /> Em estoque ({stock} {match.unit})
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+      <AlertTriangle className="h-3 w-3" /> Estoque baixo ({stock} {match.unit})
+    </span>
+  );
+}
+
+// ── Página Principal ──────────────────────────────────────────────────────────
 
 export function ComprasDetail() {
   const params = useParams();
@@ -139,30 +154,21 @@ export function ComprasDetail() {
   const [supplierId, setSupplierId] = useState("");
   const [deliveryDays, setDeliveryDays] = useState("");
   const [freightCost, setFreightCost] = useState("");
+  const [discount, setDiscount] = useState("");
   const [quoteNotes, setQuoteNotes] = useState("");
   const [quoteItems, setQuoteItems] = useState<{ materialName: string; quantity: string; unit: string; unitPrice: string }[]>([]);
 
-  const { data: request, isLoading: isLoadingRequest } = useGetPurchaseRequest(
-    id,
-    { query: { enabled: !!id, queryKey: getGetPurchaseRequestQueryKey(id) } }
-  );
-
-  const { data: quotes, isLoading: isLoadingQuotes } = useCompareQuotes(
-    { request_id: id },
-    { query: { enabled: !!id, queryKey: getCompareQuotesQueryKey({ request_id: id }) } }
-  );
-
+  const { data: request, isLoading: isLoadingRequest } = useGetPurchaseRequest(id, { query: { enabled: !!id, queryKey: getGetPurchaseRequestQueryKey(id) } });
+  const { data: quotes, isLoading: isLoadingQuotes } = useCompareQuotes({ request_id: id }, { query: { enabled: !!id, queryKey: getCompareQuotesQueryKey({ request_id: id }) } });
   const { data: suppliers } = useListSuppliers({}, {});
+  const { data: materials } = useListMaterials();
   const { mutate: createQuote, isPending: isCreatingQuote } = useCreateQuote();
   const { mutate: approveQuote, isPending: isApprovingQuote } = useApproveQuote();
 
   function openQuoteModal() {
     if (request?.items) {
       setQuoteItems(request.items.map(i => ({
-        materialName: i.materialName,
-        quantity: i.quantity.toString(),
-        unit: i.unit,
-        unitPrice: "",
+        materialName: i.materialName, quantity: i.quantity.toString(), unit: i.unit, unitPrice: "",
       })));
     }
     setShowQuoteModal(true);
@@ -172,47 +178,40 @@ export function ComprasDetail() {
     setQuoteItems(quoteItems.map((item, i) => i === index ? { ...item, [field]: value } : item));
   }
 
-  // Callback quando OCR retorna dados
-  function handleOcrExtracted(data: {
-    prices: Record<string, string>;
-    supplierName?: string;
-    deliveryDays?: string;
-    freightCost?: string;
-    notes?: string;
-  }) {
-    // Preenche preços dos itens
-    setQuoteItems((prev) =>
-      prev.map((item) => ({
-        ...item,
-        unitPrice: data.prices?.[item.materialName] ?? item.unitPrice,
-      }))
-    );
-    // Preenche fornecedor se encontrado (busca por nome)
+  function handleOcrExtracted(data: any) {
+    setQuoteItems((prev) => prev.map((item) => ({
+      ...item,
+      unitPrice: data.prices?.[item.materialName] ?? item.unitPrice,
+    })));
     if (data.supplierName && suppliers) {
-      const found = (suppliers as any[]).find((s) =>
-        s.name.toLowerCase().includes(data.supplierName!.toLowerCase())
-      );
+      const found = (suppliers as any[]).find(s => s.name.toLowerCase().includes(data.supplierName.toLowerCase()));
       if (found) setSupplierId(found.id.toString());
     }
     if (data.deliveryDays) setDeliveryDays(data.deliveryDays);
     if (data.freightCost) setFreightCost(data.freightCost);
-    if (data.notes) setQuoteNotes((prev) => prev ? `${prev}\n${data.notes}` : data.notes!);
+    if (data.notes) setQuoteNotes((prev) => prev ? `${prev}\n${data.notes}` : data.notes);
   }
 
+  // Calcula total com desconto para exibição no modal
+  const subtotal = quoteItems.reduce((sum, i) => sum + (parseFloat(i.unitPrice || "0") * parseFloat(i.quantity || "0")), 0);
+  const discountValue = subtotal * (parseFloat(discount || "0") / 100);
+  const total = subtotal - discountValue + parseFloat(freightCost || "0");
+
   function handleCreateQuote() {
-    if (!supplierId || !deliveryDays || quoteItems.some(i => !i.unitPrice)) return;
+    if (!supplierId || !deliveryDays || quoteItems.some(i => !i.unitPrice)) {
+      toast.error("Preencha fornecedor, prazo e todos os preços."); return;
+    }
     createQuote({
       data: {
         purchaseRequestId: id,
         supplierId: parseInt(supplierId),
         deliveryDays: parseInt(deliveryDays),
         freightCost: freightCost || undefined,
+        discount: discount ? parseFloat(discount) : undefined,
         notes: quoteNotes,
         items: quoteItems.map(i => ({
-          materialName: i.materialName,
-          quantity: parseFloat(i.quantity),
-          unit: i.unit,
-          unitPrice: parseFloat(i.unitPrice),
+          materialName: i.materialName, quantity: parseFloat(i.quantity),
+          unit: i.unit, unitPrice: parseFloat(i.unitPrice),
         })),
       }
     }, {
@@ -220,7 +219,7 @@ export function ComprasDetail() {
         queryClient.invalidateQueries({ queryKey: getCompareQuotesQueryKey({ request_id: id }) });
         queryClient.invalidateQueries({ queryKey: getGetPurchaseRequestQueryKey(id) });
         setShowQuoteModal(false);
-        setSupplierId(""); setDeliveryDays(""); setFreightCost(""); setQuoteNotes("");
+        setSupplierId(""); setDeliveryDays(""); setFreightCost(""); setQuoteNotes(""); setDiscount("");
       }
     });
   }
@@ -248,9 +247,7 @@ export function ComprasDetail() {
               {isLoadingRequest ? <Skeleton className="h-8 w-64" /> : request?.title}
             </h2>
             {request && (
-              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                {request.status}
-              </Badge>
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">{request.status}</Badge>
             )}
           </div>
           <p className="text-muted-foreground flex items-center gap-2 mt-1">
@@ -271,19 +268,21 @@ export function ComprasDetail() {
             {isLoadingRequest ? <Skeleton className="h-48 w-full" /> : request?.items && request.items.length > 0 ? (
               <div className="rounded-md border divide-y">
                 <div className="grid grid-cols-12 gap-4 p-4 font-medium bg-muted/50 text-sm text-muted-foreground">
-                  <div className="col-span-6">Material</div>
+                  <div className="col-span-5">Material</div>
                   <div className="col-span-2 text-right">Qtd</div>
                   <div className="col-span-2">Unidade</div>
-                  <div className="col-span-2 text-right">Obs</div>
+                  <div className="col-span-3">Estoque</div>
                 </div>
                 {request.items.map((item) => (
                   <div key={item.id} className="grid grid-cols-12 gap-4 p-4 items-center text-sm">
-                    <div className="col-span-6 font-medium flex items-center gap-2">
+                    <div className="col-span-5 font-medium flex items-center gap-2">
                       <Package className="h-4 w-4 text-muted-foreground" />{item.materialName}
                     </div>
                     <div className="col-span-2 text-right">{item.quantity}</div>
                     <div className="col-span-2">{item.unit}</div>
-                    <div className="col-span-2 text-right text-muted-foreground">{item.notes || '-'}</div>
+                    <div className="col-span-3">
+                      {materials && <StockBadge materialName={item.materialName} materials={materials as any[]} />}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -322,6 +321,7 @@ export function ComprasDetail() {
         </div>
       </div>
 
+      {/* Comparação de cotações */}
       <Card className="border-primary/20">
         <CardHeader className="bg-primary/5 pb-4">
           <div className="flex items-center gap-2">
@@ -338,20 +338,29 @@ export function ComprasDetail() {
                 </div>
               )}
               <div className="grid gap-4 md:grid-cols-3">
-                {quotes.quotes.map((quote) => {
+                {quotes.quotes.map((quote: any) => {
                   const isRecommended = quote.id === quotes.recommendedQuoteId;
+                  const discountPct = quote.discount ? parseFloat(quote.discount) : 0;
+                  const discountAmt = quote.totalAmount * (discountPct / 100);
+                  const finalAmount = quote.totalAmount - discountAmt;
                   return (
                     <Card key={quote.id} className={`relative overflow-hidden ${isRecommended ? 'border-accent shadow-sm' : ''}`}>
                       {isRecommended && (
-                        <div className="absolute top-0 right-0 bg-accent text-accent-foreground text-[10px] font-bold px-2 py-1 rounded-bl-lg">
-                          MELHOR PREÇO
-                        </div>
+                        <div className="absolute top-0 right-0 bg-accent text-accent-foreground text-[10px] font-bold px-2 py-1 rounded-bl-lg">MELHOR PREÇO</div>
                       )}
                       <CardHeader className="pb-2">
                         <CardTitle className="text-base">{quote.supplierName}</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold mb-4">{formatCurrency(quote.totalAmount)}</div>
+                        <div className="text-2xl font-bold mb-1">{formatCurrency(finalAmount)}</div>
+                        {discountPct > 0 && (
+                          <div className="flex items-center gap-1.5 mb-3">
+                            <span className="text-xs text-muted-foreground line-through">{formatCurrency(quote.totalAmount)}</span>
+                            <Badge className="text-xs bg-green-100 text-green-700 border-green-200">
+                              -{discountPct}% desconto
+                            </Badge>
+                          </div>
+                        )}
                         <div className="space-y-2 text-sm text-muted-foreground">
                           <div className="flex justify-between">
                             <span>Prazo:</span>
@@ -361,21 +370,20 @@ export function ComprasDetail() {
                             <span>Frete:</span>
                             <span className="font-medium text-foreground">{quote.freightCost ? formatCurrency(quote.freightCost) : 'Grátis'}</span>
                           </div>
+                          {discountPct > 0 && (
+                            <div className="flex justify-between text-green-600">
+                              <span>Desconto:</span>
+                              <span className="font-medium">-{formatCurrency(discountAmt)}</span>
+                            </div>
+                          )}
                         </div>
-                        {quote.status !== 'approved' && (
-                          <Button
-                            className="w-full mt-6"
-                            variant={isRecommended ? "default" : "outline"}
-                            onClick={() => handleApproveQuote(quote.id)}
-                            disabled={isApprovingQuote}
-                          >
+                        {quote.status !== 'approved' ? (
+                          <Button className="w-full mt-6" variant={isRecommended ? "default" : "outline"}
+                            onClick={() => handleApproveQuote(quote.id)} disabled={isApprovingQuote}>
                             Aprovar esta Cotação
                           </Button>
-                        )}
-                        {quote.status === 'approved' && (
-                          <Badge className="w-full mt-6 justify-center py-2 bg-secondary/10 text-secondary border-secondary/20">
-                            ✓ Aprovada
-                          </Badge>
+                        ) : (
+                          <Badge className="w-full mt-6 justify-center py-2 bg-secondary/10 text-secondary border-secondary/20">✓ Aprovada</Badge>
                         )}
                       </CardContent>
                     </Card>
@@ -391,19 +399,12 @@ export function ComprasDetail() {
         </CardContent>
       </Card>
 
-      {/* Modal Adicionar Cotação com OCR */}
+      {/* Modal Adicionar Cotação */}
       <Dialog open={showQuoteModal} onOpenChange={setShowQuoteModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Adicionar Cotação</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Adicionar Cotação</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-
-            {/* OCR — leitura automática do orçamento */}
-            <OcrUpload
-              itemNames={quoteItems.map((i) => i.materialName)}
-              onExtracted={handleOcrExtracted}
-            />
+            <OcrQuoteUpload itemNames={quoteItems.map(i => i.materialName)} onExtracted={handleOcrExtracted} />
 
             <div className="relative flex items-center gap-2">
               <div className="flex-1 border-t" />
@@ -417,9 +418,7 @@ export function ComprasDetail() {
                 <Select value={supplierId} onValueChange={setSupplierId}>
                   <SelectTrigger><SelectValue placeholder="Selecione o fornecedor" /></SelectTrigger>
                   <SelectContent>
-                    {suppliers?.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                    ))}
+                    {suppliers?.map((s: any) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -431,6 +430,26 @@ export function ComprasDetail() {
                 <Label>Frete (R$)</Label>
                 <Input type="number" placeholder="0,00" value={freightCost} onChange={e => setFreightCost(e.target.value)} />
               </div>
+
+              {/* Campo de desconto */}
+              <div className="col-span-2 space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <Percent className="h-3.5 w-3.5" /> Desconto negociado (%)
+                </Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number" min="0" max="100" placeholder="Ex: 5"
+                    value={discount} onChange={e => setDiscount(e.target.value)}
+                    className="max-w-[120px]"
+                  />
+                  {discount && parseFloat(discount) > 0 && subtotal > 0 && (
+                    <span className="text-sm text-green-600 font-medium">
+                      Economia de {formatCurrency(discountValue)} • Total: {formatCurrency(total)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div className="col-span-2 space-y-2">
                 <Label>Observações</Label>
                 <Textarea placeholder="Condições de pagamento, validade da cotação..." value={quoteNotes} onChange={e => setQuoteNotes(e.target.value)} />
@@ -444,12 +463,8 @@ export function ComprasDetail() {
                   <div className="col-span-5 text-sm font-medium">{item.materialName}</div>
                   <div className="col-span-2 text-sm text-muted-foreground">{item.quantity} {item.unit}</div>
                   <div className="col-span-5">
-                    <Input
-                      type="number"
-                      placeholder="Preço unitário *"
-                      value={item.unitPrice}
-                      onChange={e => updateQuoteItem(index, "unitPrice", e.target.value)}
-                    />
+                    <Input type="number" placeholder="Preço unitário *" value={item.unitPrice}
+                      onChange={e => updateQuoteItem(index, "unitPrice", e.target.value)} />
                   </div>
                 </div>
               ))}
