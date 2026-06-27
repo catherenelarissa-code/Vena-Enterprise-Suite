@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import {
   useGetPurchaseRequest, getGetPurchaseRequestQueryKey,
@@ -63,7 +63,7 @@ function OcrQuoteUpload({ itemNames, onExtracted }: {
     setIsLoading(true);
     try {
       const { base64, mediaType } = await compressAndEncode(file);
-      const res = await fetch("/api/automation/ocr-quote", {
+      const res = await fetch("https://workspaceapi-server-production-783e.up.railway.app/api/automation/ocr-quote", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64, mediaType, itemNames }),
@@ -161,7 +161,13 @@ export function ComprasDetail() {
   const { data: request, isLoading: isLoadingRequest } = useGetPurchaseRequest(id, { query: { enabled: !!id, queryKey: getGetPurchaseRequestQueryKey(id) } });
   const { data: quotes, isLoading: isLoadingQuotes } = useCompareQuotes({ request_id: id }, { query: { enabled: !!id, queryKey: getCompareQuotesQueryKey({ request_id: id }) } });
   const { data: suppliers } = useListSuppliers({}, {});
-  const { data: materials } = useListMaterials();
+  const [materials, setMaterials] = useState<any[]>([]);
+  useEffect(() => {
+    fetch("/api/materials", { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(setMaterials)
+      .catch(() => {});
+  }, []);
   const { mutate: createQuote, isPending: isCreatingQuote } = useCreateQuote();
   const { mutate: approveQuote, isPending: isApprovingQuote } = useApproveQuote();
 
