@@ -53,7 +53,7 @@ router.patch("/templates/:id", async (req, res) => {
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
     if (template !== undefined) updates.template = template;
-    if (label !== undefined) updates.label = label || null;  // ← salva etiqueta
+    if (label !== undefined) updates.label = label || null;
 
     await db.update(messageTemplatesTable).set(updates).where(eq(messageTemplatesTable.id, id));
     const [updated] = await db.select().from(messageTemplatesTable).where(eq(messageTemplatesTable.id, id));
@@ -75,7 +75,7 @@ router.delete("/templates/:id", async (req, res) => {
   }
 });
 
-// POST /api/automation/ocr - OCR para modelos de mensagem (mantido para compatibilidade)
+// POST /api/automation/ocr - OCR para modelos de mensagem
 router.post("/ocr", async (req, res) => {
   try {
     const { imageBase64, mediaType, templateFields } = req.body;
@@ -137,7 +137,7 @@ Não inclua markdown, blocos de código ou texto fora do JSON.`,
   }
 });
 
-// POST /api/automation/ocr-quote - OCR específico para leitura de orçamentos em Compras
+// POST /api/automation/ocr-quote - OCR para leitura de orçamentos em Cotações
 router.post("/ocr-quote", async (req, res) => {
   try {
     const { imageBase64, mediaType, itemNames } = req.body;
@@ -200,6 +200,76 @@ Não inclua markdown, blocos de código ou texto fora do JSON.`,
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({ error: err.message ?? "Erro ao processar orçamento" });
+  }
+});
+
+// POST /api/automation/ocr-materials - OCR para extração de lista de materiais em Solicitações
+router.post("/ocr-materials", async (req, res) => {
+  try {
+    const { imageBase64, mediaType } = req.body;
+    if (!imageBase64 || !mediaType) {
+      return res.status(400).json({ error: "Imagem é obrigatória" });
+    }
+
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
+          {
+            type: "text",
+            text: `Você está analisando um documento que pode ser uma lista de materiais, orçamento, nota fiscal ou qualquer documento com itens de compra.
+
+Extraia TODOS os itens/materiais listados no documento com suas respectivas quantidades e unidades de medida.
+
+Para a unidade, use apenas: un, m, m², kg, cx, rolo, pç, lt
+Se a unidade não estiver clara, use "un".
+Se a quantidade não estiver clara, use "1".
+
+Responda APENAS com um JSON válido neste formato exato:
+{
+  "items": [
+    {
+      "materialName": "nome do material",
+      "quantity": "quantidade numérica",
+      "unit": "unidade",
+      "notes": "observação se houver ou vazio"
+    }
+  ]
+}
+
+Exemplos:
+{
+  "items": [
+    { "materialName": "Cabo PP 2x2,5mm²", "quantity": "50", "unit": "m", "notes": "" },
+    { "materialName": "Disjuntor 63A bifásico", "quantity": "2", "unit": "un", "notes": "tipo DIN" },
+    { "materialName": "Caixa de passagem 4x4", "quantity": "10", "unit": "un", "notes": "" }
+  ]
+}
+
+Não inclua markdown, blocos de código ou texto fora do JSON.
+Se não encontrar nenhum item, retorne { "items": [] }.`,
+          },
+        ],
+      }],
+    });
+
+    const text = response.content.filter((b) => b.type === "text").map((b) => (b as any).text).join("");
+    let parsed;
+    try {
+      parsed = JSON.parse(text.trim());
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) parsed = JSON.parse(match[0]);
+      else return res.status(500).json({ error: "Não foi possível interpretar a resposta da IA" });
+    }
+
+    return res.json(parsed);
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ error: err.message ?? "Erro ao processar materiais" });
   }
 });
 
