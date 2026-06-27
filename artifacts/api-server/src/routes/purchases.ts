@@ -9,7 +9,7 @@ import {
   projectsTable,
   suppliersTable,
 } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -40,7 +40,8 @@ async function enrichRequest(req: any) {
   };
 }
 
-// Purchase Requests
+// ── Purchase Requests ─────────────────────────────────────────────────────────
+
 router.get("/requests", async (req, res) => {
   const { status, project_id } = req.query as { status?: string; project_id?: string };
   let reqs = await db.select().from(purchaseRequestsTable).orderBy(purchaseRequestsTable.createdAt);
@@ -92,16 +93,53 @@ router.patch("/requests/:id", async (req, res) => {
   return res.json(await enrichRequest(pr));
 });
 
-// Quotes
+// ✅ DELETE /requests/:id — exclui solicitação e tudo vinculado
+router.delete("/requests/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    // Busca cotações vinculadas
+    const quotes = await db.select().from(quotesTable).where(eq(quotesTable.purchaseRequestId, id));
+
+    // Deleta itens das cotações
+    for (const quote of quotes) {
+      await db.delete(quoteItemsTable).where(eq(quoteItemsTable.quoteId, quote.id));
+      await db.delete(purchaseOrdersTable).where(eq(purchaseOrdersTable.quoteId, quote.id));
+    }
+
+    // Deleta cotações
+    await db.delete(quotesTable).where(eq(quotesTable.purchaseRequestId, id));
+
+    // Deleta itens da solicitação
+    await db.delete(purchaseRequestItemsTable).where(eq(purchaseRequestItemsTable.requestId, id));
+
+    // Deleta a solicitação
+    await db.delete(purchaseRequestsTable).where(eq(purchaseRequestsTable.id, id));
+
+    return res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao excluir solicitação" });
+  }
+});
+
+// ── Quotes ────────────────────────────────────────────────────────────────────
+
 async function enrichQuote(quote: any) {
   const items = await db.select().from(quoteItemsTable).where(eq(quoteItemsTable.quoteId, quote.id));
   const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, quote.supplierId)).limit(1);
-  const totalAmount = items.reduce((s: number, i: any) => s + parseFloat(i.unitPrice) * parseFloat(i.quantity), 0);
+  const subtotal = items.reduce((s: number, i: any) => s + parseFloat(i.unitPrice) * parseFloat(i.quantity), 0);
+  const discountPct = quote.discount ? parseFloat(quote.discount) : 0;
+  const discountAmount = subtotal * (discountPct / 100);
+  const totalAmount = subtotal - discountAmount;
   return {
     id: quote.id,
     purchaseRequestId: quote.purchaseRequestId,
     supplierId: quote.supplierId,
     supplierName: supplier?.name ?? "Desconhecido",
+    subtotal,
+    discount: discountPct,
+    discountAmount,
     totalAmount,
     deliveryDays: quote.deliveryDays,
     freightCost: quote.freightCost ? parseFloat(quote.freightCost) : null,
@@ -127,12 +165,13 @@ router.get("/quotes", async (req, res) => {
 });
 
 router.post("/quotes", async (req, res) => {
-  const { purchaseRequestId, supplierId, deliveryDays, freightCost, notes, items } = req.body;
+  const { purchaseRequestId, supplierId, deliveryDays, freightCost, discount, notes, items } = req.body;
   const [quote] = await db.insert(quotesTable).values({
     purchaseRequestId,
     supplierId,
     deliveryDays,
     freightCost: freightCost?.toString(),
+    discount: discount?.toString() ?? "0",   // ✅ salva desconto
     notes,
   }).returning();
 
@@ -215,7 +254,8 @@ router.get("/quotes/compare", async (req, res) => {
   });
 });
 
-// Purchase Orders
+// ── Purchase Orders ───────────────────────────────────────────────────────────
+
 router.get("/orders", async (req, res) => {
   const { status, supplier_id } = req.query as { status?: string; supplier_id?: string };
   let orders = await db.select().from(purchaseOrdersTable).orderBy(purchaseOrdersTable.createdAt);
