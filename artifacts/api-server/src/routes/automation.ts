@@ -5,6 +5,14 @@ import { eq } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 
 const router = Router();
+
+router.get("/ping", (req, res) => {
+  res.json({
+    ok: true,
+    route: "automation"
+  });
+});
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // GET /api/automation/templates - Listar modelos
