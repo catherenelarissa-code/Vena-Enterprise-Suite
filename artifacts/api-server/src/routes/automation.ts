@@ -6,10 +6,10 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const router = Router();
 
-router.get("/ping", (req, res) => {
-  res.json({
+router.get("/ping", async (req, res) => {
+  return res.json({
     ok: true,
-    route: "automation"
+    timestamp: new Date().toISOString()
   });
 });
 
