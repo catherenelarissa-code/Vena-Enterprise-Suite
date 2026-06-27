@@ -80,7 +80,7 @@ function OcrMaterialsUpload({ onExtracted }: { onExtracted: (items: Item[]) => v
     setIsLoading(true);
     try {
       const { base64, mediaType } = await compressAndEncode(file);
-      const res = await fetch("/api/automation/ocr-materials", {
+      const res = await fetch("https://workspaceapi-server-production-783e.up.railway.app/api/automation/ocr-materials", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64, mediaType }),
