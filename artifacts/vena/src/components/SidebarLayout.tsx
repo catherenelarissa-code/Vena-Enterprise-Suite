@@ -70,7 +70,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   <img 
     src="/png_vena.png" 
     alt="Vena Engenharia" 
-    className="h-10 w-auto object-contain"
+    className="h-14 w-auto object-contain"
   />
 </div>
 
