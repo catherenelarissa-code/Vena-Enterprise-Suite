@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, numeric, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, numeric, integer, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +15,18 @@ export const monitoredProductsTable = pgTable("monitored_products", {
   alertThresholdPercent: numeric("alert_threshold_percent", { precision: 5, scale: 2 }).notNull().default("10"),
   aiInsight: text("ai_insight"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// NOVO: múltiplos links por produto para comparação entre fornecedores
+export const productLinksTable = pgTable("product_links", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => monitoredProductsTable.id),
+  supplierName: text("supplier_name").notNull(), // ex: "Mercado Livre", "Amazon", "Shopee"
+  url: text("url").notNull(),
+  currentPrice: numeric("current_price", { precision: 12, scale: 2 }),
+  isMain: boolean("is_main").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const priceHistoryTable = pgTable("price_history", {
@@ -41,3 +53,4 @@ export type InsertMonitoredProduct = z.infer<typeof insertMonitoredProductSchema
 export type MonitoredProduct = typeof monitoredProductsTable.$inferSelect;
 export type PriceHistory = typeof priceHistoryTable.$inferSelect;
 export type PriceAlert = typeof priceAlertsTable.$inferSelect;
+export type ProductLink = typeof productLinksTable.$inferSelect;
