@@ -68,10 +68,13 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
        {/* Logo */}
 <div className="flex h-16 shrink-0 items-center px-5 border-b border-white/5">
   <div className="flex items-center gap-3">
-    <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="8" y="8" width="42" height="42" rx="8" fill="#F97316" transform="rotate(0 8 8)"/>
-      <rect x="30" y="30" width="42" height="42" rx="8" fill="#F97316" opacity="0.85"/>
-      <rect x="22" y="22" width="36" height="36" rx="6" fill="#1a1a1a"/>
+    <svg width="38" height="38" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Paralelogramo de cima (esquerda) */}
+      <path d="M10 25 L45 10 L60 40 L25 55 Z" fill="#F97316"/>
+      {/* Paralelogramo de baixo (direita) */}
+      <path d="M40 60 L75 45 L90 75 L55 90 Z" fill="#F97316"/>
+      {/* Recorte branco/escuro no centro para criar o efeito de entrelaçado */}
+      <path d="M40 40 L60 40 L60 60 L40 60 Z" fill="#0f1a12"/>
     </svg>
     <div className="flex flex-col leading-tight">
       <span className="text-lg font-bold tracking-tight text-white">vena</span>
