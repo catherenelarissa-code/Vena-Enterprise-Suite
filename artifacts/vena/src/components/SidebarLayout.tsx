@@ -68,12 +68,11 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
        {/* Logo */}
 <div className="flex h-20 shrink-0 items-center justify-center px-4 border-b border-white/5">
   <img 
-    src="/png_vena.png" 
+    src="/vena_logo.png" 
     alt="Vena Engenharia" 
-    className="w-40 object-contain"
+    className="w-44 object-contain"
   />
 </div>
-
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4">
           <ul className="space-y-0.5 px-2">
