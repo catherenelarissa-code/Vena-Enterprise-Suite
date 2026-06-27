@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, Copy, Check, Upload, Sparkles,
-  MessageSquare, FileText, X, ChevronRight,
+  MessageSquare, FileText, X, ChevronRight, Tag, PenLine,
 } from "lucide-react";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
@@ -20,10 +20,26 @@ type Template = {
   name: string;
   description?: string;
   template: string;
+  label?: string;       // ← etiqueta/categoria
   createdAt: string;
 };
 
 type ExtractedFields = Record<string, string | null>;
+
+// ── Etiquetas disponíveis ─────────────────────────────────────────────────────
+
+const LABEL_OPTIONS = [
+  { value: "procuracao", label: "Procurações", color: "bg-purple-100 text-purple-700 border-purple-300" },
+  { value: "whatsapp", label: "WhatsApp", color: "bg-green-100 text-green-700 border-green-300" },
+  { value: "proposta", label: "Propostas", color: "bg-blue-100 text-blue-700 border-blue-300" },
+  { value: "contrato", label: "Contratos", color: "bg-orange-100 text-orange-700 border-orange-300" },
+  { value: "cobranca", label: "Cobranças", color: "bg-red-100 text-red-700 border-red-300" },
+  { value: "outro", label: "Outro", color: "bg-gray-100 text-gray-600 border-gray-300" },
+];
+
+function getLabelInfo(value?: string) {
+  return LABEL_OPTIONS.find((l) => l.value === value) ?? null;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,6 +82,156 @@ function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }
   });
 }
 
+// ── Caixinha de Variáveis com scroll, adicionar e editar ──────────────────────
+
+function VariablesBox({
+  onInsert,
+}: {
+  onInsert: (v: string) => void;
+}) {
+  const DEFAULT_VARS = [
+    "NOME_CLIENTE", "VALOR", "DATA", "POTENCIA", "PAGAMENTO",
+    "ENDERECO", "CPF_CNPJ", "UNIDADE", "NUMERO_PEDIDO",
+  ];
+
+  const [vars, setVars] = useState<string[]>(DEFAULT_VARS);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [newVar, setNewVar] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+
+  function startEdit(idx: number) {
+    setEditingIdx(idx);
+    setEditValue(vars[idx]);
+  }
+
+  function confirmEdit(idx: number) {
+    const cleaned = editValue.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+    if (!cleaned) { setEditingIdx(null); return; }
+    const updated = [...vars];
+    updated[idx] = cleaned;
+    setVars(updated);
+    setEditingIdx(null);
+  }
+
+  function addVar() {
+    const cleaned = newVar.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+    if (!cleaned || vars.includes(cleaned)) {
+      toast.error("Nome inválido ou já existe.");
+      return;
+    }
+    setVars([...vars, cleaned]);
+    setNewVar("");
+    setShowAdd(false);
+  }
+
+  function removeVar(idx: number) {
+    setVars(vars.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <div className="border rounded-lg bg-muted/30">
+      {/* header da caixinha */}
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40 rounded-t-lg">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          Variáveis disponíveis
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowAdd((v) => !v)}
+          className="text-xs flex items-center gap-1 text-primary hover:underline"
+        >
+          <Plus className="h-3 w-3" /> Adicionar
+        </button>
+      </div>
+
+      {/* campo para nova variável */}
+      {showAdd && (
+        <div className="flex gap-2 px-3 py-2 border-b bg-background">
+          <Input
+            className="h-7 text-xs font-mono"
+            placeholder="NOVA_VAR"
+            value={newVar}
+            onChange={(e) => setNewVar(e.target.value.toUpperCase())}
+            onKeyDown={(e) => e.key === "Enter" && addVar()}
+            autoFocus
+          />
+          <Button size="sm" className="h-7 px-2 text-xs" onClick={addVar}>OK</Button>
+          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setShowAdd(false)}>
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
+
+      {/* lista com scroll */}
+      <div className="max-h-44 overflow-y-auto divide-y">
+        {vars.map((v, idx) => (
+          <div
+            key={v}
+            className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/50 group"
+          >
+            {editingIdx === idx ? (
+              <>
+                <Input
+                  className="h-6 text-xs font-mono flex-1"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === "Enter" && confirmEdit(idx)}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => confirmEdit(idx)}
+                  className="text-primary hover:text-primary/80"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingIdx(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onInsert(v)}
+                  className="flex-1 text-left text-xs font-mono text-primary hover:underline"
+                >
+                  {`{${v}}`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startEdit(idx)}
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+                >
+                  <PenLine className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeVar(idx)}
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="px-3 py-1.5 border-t">
+        <p className="text-xs text-muted-foreground">
+          Clique para inserir no modelo. Você também pode digitar <span className="font-mono">{"{MINHA_VAR}"}</span> diretamente.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Modal: Criar/Editar Template ─────────────────────────────────────────────
 
 function TemplateModal({
@@ -81,13 +247,34 @@ function TemplateModal({
     name: editing?.name ?? "",
     description: editing?.description ?? "",
     template: editing?.template ?? "",
+    label: editing?.label ?? "",
   });
   const [isPending, setIsPending] = useState(false);
 
   const variables = extractVariables(form.template);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Insere variável na posição do cursor
+  function insertVariable(v: string) {
+    const el = textareaRef.current;
+    if (el) {
+      const start = el.selectionStart ?? el.value.length;
+      const end = el.selectionEnd ?? el.value.length;
+      const inserted = `{${v}}`;
+      const newVal = form.template.slice(0, start) + inserted + form.template.slice(end);
+      setForm((f) => ({ ...f, template: newVal }));
+      // Reposiciona cursor após inserção
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(start + inserted.length, start + inserted.length);
+      }, 0);
+    } else {
+      setForm((f) => ({ ...f, template: f.template + `{${v}}` }));
+    }
+  }
 
   async function handleSave() {
-    if (!form.name || !form.template) {
+    if (!form.name.trim() || !form.template.trim()) {
       toast.error("Nome e modelo são obrigatórios.");
       return;
     }
@@ -115,22 +302,15 @@ function TemplateModal({
     }
   }
 
-  function insertVariable(v: string) {
-    setForm((f) => ({ ...f, template: f.template + `{${v}}` }));
-  }
-
-  const SUGGESTED_VARS = [
-    "NOME_CLIENTE", "VALOR", "DATA", "POTENCIA", "PAGAMENTO",
-    "ENDERECO", "CPF_CNPJ", "UNIDADE", "NUMERO_PEDIDO",
-  ];
-
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Editar Modelo" : "Novo Modelo de Mensagem"}</DialogTitle>
         </DialogHeader>
+
         <div className="space-y-4 py-2">
+          {/* Nome + Descrição */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Nome do modelo *</Label>
@@ -150,25 +330,42 @@ function TemplateModal({
             </div>
           </div>
 
+          {/* Etiqueta */}
           <div className="space-y-1.5">
-            <Label>Variáveis disponíveis</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {SUGGESTED_VARS.map((v) => (
+            <Label className="flex items-center gap-1.5">
+              <Tag className="h-3.5 w-3.5" /> Etiqueta / Categoria
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {LABEL_OPTIONS.map((opt) => (
                 <button
-                  key={v}
-                  onClick={() => insertVariable(v)}
-                  className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-mono"
+                  key={opt.value}
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({ ...f, label: f.label === opt.value ? "" : opt.value }))
+                  }
+                  className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+                    form.label === opt.value
+                      ? opt.color + " ring-2 ring-offset-1 ring-current"
+                      : "bg-background text-muted-foreground border-border hover:border-primary/40"
+                  }`}
                 >
-                  {`{${v}}`}
+                  {opt.label}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">Clique para inserir no modelo. Você pode criar variáveis customizadas digitando {`{MINHA_VAR}`} diretamente.</p>
           </div>
 
+          {/* Variáveis — caixinha com scroll */}
+          <div className="space-y-1.5">
+            <Label>Variáveis disponíveis</Label>
+            <VariablesBox onInsert={insertVariable} />
+          </div>
+
+          {/* Modelo da mensagem */}
           <div className="space-y-1.5">
             <Label>Modelo da mensagem *</Label>
             <Textarea
+              ref={textareaRef}
               placeholder={`Olá {NOME_CLIENTE}, tudo bem?\n\nSegue sua proposta:\nPotência: {POTENCIA}\nValor: {VALOR}\nPagamento: {PAGAMENTO}`}
               value={form.template}
               onChange={(e) => setForm((f) => ({ ...f, template: e.target.value }))}
@@ -177,6 +374,7 @@ function TemplateModal({
             />
           </div>
 
+          {/* Variáveis detectadas */}
           {variables.length > 0 && (
             <div className="p-3 rounded-lg bg-muted/50 space-y-1">
               <p className="text-xs font-medium text-muted-foreground">Variáveis detectadas neste modelo:</p>
@@ -188,8 +386,11 @@ function TemplateModal({
             </div>
           )}
         </div>
+
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>
+            Cancelar
+          </Button>
           <Button onClick={handleSave} disabled={isPending}>
             {isPending ? "Salvando..." : "Salvar"}
           </Button>
@@ -221,6 +422,7 @@ function UseTemplatePanel({
   const variables = extractVariables(template.template);
   const preview = applyFields(template.template, fields);
   const hasUnfilled = variables.some((v) => !fields[v]);
+  const labelInfo = getLabelInfo(template.label);
 
   async function handleImage(file: File) {
     if (!file.type.startsWith("image/")) {
@@ -236,11 +438,7 @@ function UseTemplatePanel({
       const { base64, mediaType } = await fileToBase64(file);
       const result = await apiCall("/ocr", {
         method: "POST",
-        body: JSON.stringify({
-          imageBase64: base64,
-          mediaType,
-          templateFields: variables,
-        }),
+        body: JSON.stringify({ imageBase64: base64, mediaType, templateFields: variables }),
       });
 
       const extracted: ExtractedFields = {};
@@ -273,13 +471,21 @@ function UseTemplatePanel({
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
       <div className="bg-background rounded-xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
-          <div>
-            <h2 className="font-bold text-lg">{template.name}</h2>
-            {template.description && (
-              <p className="text-sm text-muted-foreground">{template.description}</p>
-            )}
+          <div className="flex items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-lg">{template.name}</h2>
+                {labelInfo && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${labelInfo.color}`}>
+                    {labelInfo.label}
+                  </span>
+                )}
+              </div>
+              {template.description && (
+                <p className="text-sm text-muted-foreground">{template.description}</p>
+              )}
+            </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
@@ -288,10 +494,7 @@ function UseTemplatePanel({
 
         <div className="flex-1 overflow-y-auto">
           <div className="grid md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x">
-
-            {/* Coluna Esquerda: Upload + Campos */}
             <div className="p-5 space-y-5">
-              {/* Upload de imagem */}
               <div>
                 <Label className="mb-2 block">Documento / Imagem para OCR</Label>
                 <div
@@ -333,7 +536,6 @@ function UseTemplatePanel({
                 )}
               </div>
 
-              {/* Campos variáveis */}
               <div className="space-y-3">
                 <Label>Preencha os campos</Label>
                 {variables.map((v) => (
@@ -349,7 +551,6 @@ function UseTemplatePanel({
               </div>
             </div>
 
-            {/* Coluna Direita: Preview */}
             <div className="p-5 space-y-4 flex flex-col">
               <div className="flex items-center justify-between">
                 <Label>Prévia da mensagem</Label>
@@ -362,12 +563,7 @@ function UseTemplatePanel({
               <div className="flex-1 min-h-[200px] p-4 rounded-lg bg-muted/40 border font-mono text-sm whitespace-pre-wrap leading-relaxed overflow-y-auto">
                 {preview || <span className="text-muted-foreground italic">A mensagem aparecerá aqui...</span>}
               </div>
-              <Button
-                onClick={handleCopy}
-                size="lg"
-                className="w-full gap-2"
-                disabled={!preview}
-              >
+              <Button onClick={handleCopy} size="lg" className="w-full gap-2" disabled={!preview}>
                 {copied ? (
                   <><Check className="h-4 w-4" /> Copiado!</>
                 ) : (
@@ -392,6 +588,12 @@ export function Automacao() {
     editing: null,
   });
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
+  const [filterLabel, setFilterLabel] = useState<string>("");   // ← filtro por etiqueta
+
+  // ✅ CORREÇÃO: useEffect no lugar de useState para carregar templates
+  useEffect(() => {
+    loadTemplates();
+  }, []);
 
   async function loadTemplates() {
     try {
@@ -404,8 +606,6 @@ export function Automacao() {
     }
   }
 
-  useState(() => { loadTemplates(); });
-
   async function handleDelete(id: number) {
     try {
       await apiCall(`/templates/${id}`, { method: "DELETE" });
@@ -415,6 +615,10 @@ export function Automacao() {
       toast.error(err.message);
     }
   }
+
+  const filtered = filterLabel
+    ? templates.filter((t) => t.label === filterLabel)
+    : templates;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -434,32 +638,84 @@ export function Automacao() {
         </Button>
       </div>
 
-      {/* Cards de modelos */}
+      {/* Filtro por etiqueta */}
+      {templates.length > 0 && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Tag className="h-3.5 w-3.5" /> Filtrar:
+          </span>
+          <button
+            type="button"
+            onClick={() => setFilterLabel("")}
+            className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+              filterLabel === ""
+                ? "bg-foreground text-background border-foreground"
+                : "bg-background text-muted-foreground border-border hover:border-primary/40"
+            }`}
+          >
+            Todos
+          </button>
+          {LABEL_OPTIONS.map((opt) => {
+            const count = templates.filter((t) => t.label === opt.value).length;
+            if (count === 0) return null;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFilterLabel(opt.value)}
+                className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+                  filterLabel === opt.value
+                    ? opt.color + " ring-2 ring-offset-1 ring-current"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/40"
+                }`}
+              >
+                {opt.label} <span className="opacity-60">({count})</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Cards */}
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-44 rounded-xl" />)}
         </div>
-      ) : templates.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="py-20 text-center border rounded-xl bg-card">
           <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
-          <p className="font-medium text-muted-foreground">Nenhum modelo criado ainda.</p>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">
-            Crie modelos de mensagem com campos variáveis que serão preenchidos automaticamente por IA.
+          <p className="font-medium text-muted-foreground">
+            {filterLabel ? "Nenhum modelo com essa etiqueta." : "Nenhum modelo criado ainda."}
           </p>
-          <Button onClick={() => setModalForm({ open: true, editing: null })}>
-            <Plus className="mr-2 h-4 w-4" /> Criar primeiro modelo
-          </Button>
+          {!filterLabel && (
+            <>
+              <p className="text-sm text-muted-foreground mt-1 mb-4">
+                Crie modelos de mensagem com campos variáveis que serão preenchidos automaticamente por IA.
+              </p>
+              <Button onClick={() => setModalForm({ open: true, editing: null })}>
+                <Plus className="mr-2 h-4 w-4" /> Criar primeiro modelo
+              </Button>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {templates.map((t) => {
+          {filtered.map((t) => {
             const vars = extractVariables(t.template);
+            const labelInfo = getLabelInfo(t.label);
             return (
               <Card key={t.id} className="flex flex-col hover:border-primary/50 transition-colors">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base truncate">{t.name}</CardTitle>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CardTitle className="text-base truncate">{t.name}</CardTitle>
+                        {labelInfo && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${labelInfo.color}`}>
+                            {labelInfo.label}
+                          </span>
+                        )}
+                      </div>
                       {t.description && (
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.description}</p>
                       )}
@@ -496,10 +752,7 @@ export function Automacao() {
                       )}
                     </div>
                   )}
-                  <Button
-                    className="w-full gap-2 mt-auto"
-                    onClick={() => setActiveTemplate(t)}
-                  >
+                  <Button className="w-full gap-2 mt-auto" onClick={() => setActiveTemplate(t)}>
                     <FileText className="h-4 w-4" />
                     Usar modelo
                     <ChevronRight className="h-4 w-4 ml-auto" />
