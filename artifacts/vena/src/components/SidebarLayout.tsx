@@ -65,18 +65,20 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
         background: "linear-gradient(180deg, hsl(152,60%,7%) 0%, hsl(152,50%,9%) 50%, hsl(220,25%,8%) 100%)",
       }}>
 
-        {/* Logo */}
-        <div className="flex h-16 shrink-0 items-center px-6 border-b border-white/5">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/20 border border-orange-500/30">
-              <Zap className="h-4 w-4 text-orange-400" />
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-xl font-bold tracking-tight text-white">vena</span>
-              <span className="text-xs font-medium text-orange-400 mt-1">engenharia</span>
-            </div>
-          </div>
-        </div>
+       {/* Logo */}
+<div className="flex h-16 shrink-0 items-center px-5 border-b border-white/5">
+  <div className="flex items-center gap-3">
+    <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="8" y="8" width="42" height="42" rx="8" fill="#F97316" transform="rotate(0 8 8)"/>
+      <rect x="30" y="30" width="42" height="42" rx="8" fill="#F97316" opacity="0.85"/>
+      <rect x="22" y="22" width="36" height="36" rx="6" fill="#1a1a1a"/>
+    </svg>
+    <div className="flex flex-col leading-tight">
+      <span className="text-lg font-bold tracking-tight text-white">vena</span>
+      <span className="text-[10px] font-medium text-green-500 tracking-widest uppercase">engenharia</span>
+    </div>
+  </div>
+</div>
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4">
