@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "wouter";
 import { useListPurchaseRequests, getListPurchaseRequestsQueryKey, useCreatePurchaseRequest } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,8 +12,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/format";
-import { Search, Plus, FileText, Filter, Clock, Trash2 } from "lucide-react";
+import { Search, Plus, FileText, Filter, Clock, Trash2, Upload, Sparkles, X, Pencil, Check } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -32,6 +35,215 @@ function getStatusLabel(status: string) {
   return map[status] || status;
 }
 
+function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve({ base64: result.split(",")[1], mediaType: file.type });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+type Item = { materialName: string; quantity: string; unit: string; notes: string };
+
+// ── Componente OCR de Materiais ───────────────────────────────────────────────
+
+function OcrMaterialsUpload({ onExtracted }: { onExtracted: (items: Item[]) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function handleFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Envie uma imagem (JPG, PNG, etc).");
+      return;
+    }
+    setPreview(URL.createObjectURL(file));
+    setIsLoading(true);
+    try {
+      const { base64, mediaType } = await fileToBase64(file);
+      const res = await fetch("/api/automation/ocr-materials", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mediaType }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Erro desconhecido" }));
+        throw new Error(err.error ?? "Erro ao processar imagem");
+      }
+      const data = await res.json();
+      if (!data.items?.length) {
+        toast.error("Nenhum material encontrado na imagem.");
+        return;
+      }
+      onExtracted(data.items);
+      toast.success(`${data.items.length} itens extraídos com sucesso!`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Erro ao ler materiais.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+          Ler materiais por imagem (IA)
+        </Label>
+        {preview && !isLoading && (
+          <button
+            type="button"
+            onClick={() => setPreview(null)}
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+          >
+            <X className="h-3 w-3" /> Remover
+          </button>
+        )}
+      </div>
+      <div
+        className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+        onClick={() => !isLoading && fileRef.current?.click()}
+        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+        onDragOver={(e) => e.preventDefault()}
+      >
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+        />
+        {isLoading ? (
+          <div className="flex flex-col items-center gap-2 py-3">
+            <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+            <p className="text-sm font-medium">Lendo materiais com IA...</p>
+            <p className="text-xs text-muted-foreground">Identificando itens, quantidades e unidades...</p>
+          </div>
+        ) : preview ? (
+          <div className="space-y-1">
+            <img src={preview} alt="Documento" className="max-h-28 mx-auto rounded object-contain" />
+            <p className="text-xs text-muted-foreground">Clique para trocar a imagem</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 py-3">
+            <Upload className="h-6 w-6 text-muted-foreground" />
+            <p className="text-sm font-medium">Fotografe o orçamento ou lista de materiais</p>
+            <p className="text-xs text-muted-foreground">A IA extrai os itens automaticamente • Arraste ou clique</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Lista de Itens editável ───────────────────────────────────────────────────
+
+function ItemRow({
+  item,
+  index,
+  canRemove,
+  onUpdate,
+  onRemove,
+}: {
+  item: Item;
+  index: number;
+  canRemove: boolean;
+  onUpdate: (index: number, field: string, value: string) => void;
+  onRemove: (index: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <div className={`grid grid-cols-12 gap-2 items-center p-3 border rounded-lg transition-colors ${editing ? "border-primary/40 bg-primary/5" : ""}`}>
+      {editing ? (
+        // Modo edição — campos abertos
+        <>
+          <div className="col-span-5">
+            <Input
+              placeholder="Material *"
+              value={item.materialName}
+              onChange={(e) => onUpdate(index, "materialName", e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="col-span-2">
+            <Input
+              placeholder="Qtd *"
+              type="number"
+              value={item.quantity}
+              onChange={(e) => onUpdate(index, "quantity", e.target.value)}
+            />
+          </div>
+          <div className="col-span-2">
+            <Select value={item.unit} onValueChange={(v) => onUpdate(index, "unit", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="un">un</SelectItem>
+                <SelectItem value="m">m</SelectItem>
+                <SelectItem value="m²">m²</SelectItem>
+                <SelectItem value="kg">kg</SelectItem>
+                <SelectItem value="cx">cx</SelectItem>
+                <SelectItem value="rolo">rolo</SelectItem>
+                <SelectItem value="pç">pç</SelectItem>
+                <SelectItem value="lt">lt</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2">
+            <Input
+              placeholder="Obs"
+              value={item.notes}
+              onChange={(e) => onUpdate(index, "notes", e.target.value)}
+            />
+          </div>
+          <div className="col-span-1 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-primary hover:text-primary/80"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          </div>
+        </>
+      ) : (
+        // Modo visualização — linha compacta
+        <>
+          <div className="col-span-5 text-sm font-medium truncate">{item.materialName || <span className="text-muted-foreground italic">sem nome</span>}</div>
+          <div className="col-span-2 text-sm text-muted-foreground">{item.quantity} {item.unit}</div>
+          <div className="col-span-3 text-xs text-muted-foreground truncate">{item.notes || "—"}</div>
+          <div className="col-span-2 flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="text-muted-foreground hover:text-foreground p-1 rounded"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            {canRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove(index)}
+                className="text-muted-foreground hover:text-destructive p-1 rounded"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Página Principal ──────────────────────────────────────────────────────────
+
 export function Compras() {
   const [activeTab, setActiveTab] = useState("solicitacoes");
   const [showModal, setShowModal] = useState(false);
@@ -39,8 +251,8 @@ export function Compras() {
   const [urgency, setUrgency] = useState("normal");
   const [notes, setNotes] = useState("");
   const [project, setProject] = useState("");
-  const [items, setItems] = useState([{ materialName: "", quantity: "", unit: "un", notes: "" }]);
-  
+  const [items, setItems] = useState<Item[]>([{ materialName: "", quantity: "", unit: "un", notes: "" }]);
+
   const queryClient = useQueryClient();
   const { data: requests, isLoading } = useListPurchaseRequests({}, { query: { queryKey: getListPurchaseRequestsQueryKey() } });
   const { mutate: createRequest, isPending } = useCreatePurchaseRequest();
@@ -57,22 +269,40 @@ export function Compras() {
     setItems(items.map((item, i) => i === index ? { ...item, [field]: value } : item));
   }
 
+  // Quando OCR retorna itens, substitui a lista atual
+  function handleOcrExtracted(extracted: Item[]) {
+    setItems(extracted);
+  }
+
+  function handleCloseModal() {
+    setShowModal(false);
+    setTitle(""); setUrgency("normal"); setNotes(""); setProject("");
+    setItems([{ materialName: "", quantity: "", unit: "un", notes: "" }]);
+  }
+
   function handleSubmit() {
-    if (!title || items.some(i => !i.materialName || !i.quantity)) return;
+    if (!title || items.some(i => !i.materialName || !i.quantity)) {
+      toast.error("Preencha o título e todos os itens.");
+      return;
+    }
     createRequest({
       data: {
         title,
         requestedBy: "Usuário atual",
         urgency: urgency as any,
         notes,
-        items: items.map(i => ({ materialName: i.materialName, quantity: parseFloat(i.quantity), unit: i.unit, notes: i.notes })),
+        items: items.map(i => ({
+          materialName: i.materialName,
+          quantity: parseFloat(i.quantity),
+          unit: i.unit,
+          notes: i.notes,
+        })),
       }
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListPurchaseRequestsQueryKey() });
-        setShowModal(false);
-        setTitle(""); setUrgency("normal"); setNotes(""); setProject("");
-        setItems([{ materialName: "", quantity: "", unit: "un", notes: "" }]);
+        handleCloseModal();
+        toast.success("Solicitação criada!");
       }
     });
   }
@@ -95,7 +325,7 @@ export function Compras() {
           <TabsTrigger value="cotacoes">Cotações</TabsTrigger>
           <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
         </TabsList>
-        
+
         <div className="mt-6 flex items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -159,16 +389,32 @@ export function Compras() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      {/* Modal Nova Solicitação */}
+      <Dialog open={showModal} onOpenChange={(open) => !open && handleCloseModal()}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nova Solicitação de Compra</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+
+            {/* OCR de materiais */}
+            <OcrMaterialsUpload onExtracted={handleOcrExtracted} />
+
+            <div className="relative flex items-center gap-2">
+              <div className="flex-1 border-t" />
+              <span className="text-xs text-muted-foreground">ou preencha manualmente</span>
+              <div className="flex-1 border-t" />
+            </div>
+
+            {/* Campos da solicitação */}
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-2">
                 <Label>Título da solicitação *</Label>
-                <Input placeholder="Ex: Materiais elétricos obra X" value={title} onChange={e => setTitle(e.target.value)} />
+                <Input
+                  placeholder="Ex: Materiais elétricos obra X"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Urgência</Label>
@@ -184,58 +430,54 @@ export function Compras() {
               </div>
               <div className="space-y-2">
                 <Label>Obra (opcional)</Label>
-                <Input placeholder="Nome da obra" value={project} onChange={e => setProject(e.target.value)} />
+                <Input placeholder="Nome da obra" value={project} onChange={(e) => setProject(e.target.value)} />
               </div>
               <div className="col-span-2 space-y-2">
                 <Label>Observações</Label>
-                <Textarea placeholder="Informações adicionais..." value={notes} onChange={e => setNotes(e.target.value)} />
+                <Textarea
+                  placeholder="Informações adicionais..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
               </div>
             </div>
 
-            <div className="space-y-3">
+            {/* Lista de itens */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Itens *</Label>
+                <Label>Itens * <span className="text-muted-foreground font-normal">({items.length})</span></Label>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
                   <Plus className="h-3 w-3 mr-1" /> Adicionar item
                 </Button>
               </div>
-              {items.map((item, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 border rounded-lg">
-                  <div className="col-span-5">
-                    <Input placeholder="Material *" value={item.materialName} onChange={e => updateItem(index, "materialName", e.target.value)} />
-                  </div>
-                  <div className="col-span-2">
-                    <Input placeholder="Qtd *" type="number" value={item.quantity} onChange={e => updateItem(index, "quantity", e.target.value)} />
-                  </div>
-                  <div className="col-span-2">
-                    <Select value={item.unit} onValueChange={v => updateItem(index, "unit", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="un">un</SelectItem>
-                        <SelectItem value="m">m</SelectItem>
-                        <SelectItem value="m²">m²</SelectItem>
-                        <SelectItem value="kg">kg</SelectItem>
-                        <SelectItem value="cx">cx</SelectItem>
-                        <SelectItem value="rolo">rolo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Input placeholder="Obs" value={item.notes} onChange={e => updateItem(index, "notes", e.target.value)} />
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    {items.length > 1 && (
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
+
+              {/* Cabeçalho */}
+              {items.length > 0 && (
+                <div className="grid grid-cols-12 gap-2 px-3 py-1 text-xs text-muted-foreground">
+                  <div className="col-span-5">Material</div>
+                  <div className="col-span-2">Qtd / Un</div>
+                  <div className="col-span-3">Obs</div>
+                  <div className="col-span-2" />
                 </div>
-              ))}
+              )}
+
+              <div className="space-y-2">
+                {items.map((item, index) => (
+                  <ItemRow
+                    key={index}
+                    item={item}
+                    index={index}
+                    canRemove={items.length > 1}
+                    onUpdate={updateItem}
+                    onRemove={removeItem}
+                  />
+                ))}
+              </div>
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={handleCloseModal}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={isPending}>
               {isPending ? "Salvando..." : "Criar Solicitação"}
             </Button>
