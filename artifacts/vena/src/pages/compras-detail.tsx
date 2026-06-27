@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { useGetPurchaseRequest, getGetPurchaseRequestQueryKey, useCompareQuotes, getCompareQuotesQueryKey, useCreateQuote, useApproveQuote, useListSuppliers } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +11,124 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ArrowLeft, FileText, Package, AlertCircle, Building2, User, Clock, Sparkles, Plus } from "lucide-react";
+import { ArrowLeft, FileText, Package, AlertCircle, Building2, User, Clock, Sparkles, Plus, Upload, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+// ── Helpers OCR ──────────────────────────────────────────────────────────────
+
+function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve({ base64: result.split(",")[1], mediaType: file.type });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function ocrQuote(
+  file: File,
+  itemNames: string[]
+): Promise<{ prices: Record<string, string>; supplierName?: string; deliveryDays?: string; freightCost?: string; notes?: string }> {
+  const { base64, mediaType } = await fileToBase64(file);
+  const res = await fetch("/api/automation/ocr-quote", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64: base64, mediaType, itemNames }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Erro desconhecido" }));
+    throw new Error(err.error ?? "Erro ao processar imagem");
+  }
+  return res.json();
+}
+
+// ── Componente OCR Upload ────────────────────────────────────────────────────
+
+function OcrUpload({
+  itemNames,
+  onExtracted,
+}: {
+  itemNames: string[];
+  onExtracted: (data: { prices: Record<string, string>; supplierName?: string; deliveryDays?: string; freightCost?: string; notes?: string }) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function handleFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Envie uma imagem (JPG, PNG, etc).");
+      return;
+    }
+    setPreview(URL.createObjectURL(file));
+    setIsLoading(true);
+    try {
+      const result = await ocrQuote(file, itemNames);
+      onExtracted(result);
+      toast.success("Orçamento lido com sucesso!");
+    } catch (err: any) {
+      toast.error(err.message ?? "Erro ao ler orçamento.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Ler orçamento por imagem (IA)</Label>
+        {preview && (
+          <button
+            type="button"
+            onClick={() => { setPreview(null); }}
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+          >
+            <X className="h-3 w-3" /> Remover
+          </button>
+        )}
+      </div>
+      <div
+        className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+        onClick={() => fileRef.current?.click()}
+        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+        onDragOver={(e) => e.preventDefault()}
+      >
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+        />
+        {isLoading ? (
+          <div className="flex flex-col items-center gap-2 py-2">
+            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+            <p className="text-sm font-medium">Lendo orçamento com IA...</p>
+            <p className="text-xs text-muted-foreground">Extraindo preços e informações...</p>
+          </div>
+        ) : preview ? (
+          <div className="space-y-1">
+            <img src={preview} alt="Orçamento" className="max-h-28 mx-auto rounded object-contain" />
+            <p className="text-xs text-muted-foreground">Clique para trocar a imagem</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 py-3">
+            <Upload className="h-6 w-6 text-muted-foreground" />
+            <p className="text-sm font-medium">Tire foto do orçamento</p>
+            <p className="text-xs text-muted-foreground">A IA preenche os preços automaticamente</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Página Principal ─────────────────────────────────────────────────────────
 
 export function ComprasDetail() {
   const params = useParams();
@@ -54,6 +170,33 @@ export function ComprasDetail() {
 
   function updateQuoteItem(index: number, field: string, value: string) {
     setQuoteItems(quoteItems.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  }
+
+  // Callback quando OCR retorna dados
+  function handleOcrExtracted(data: {
+    prices: Record<string, string>;
+    supplierName?: string;
+    deliveryDays?: string;
+    freightCost?: string;
+    notes?: string;
+  }) {
+    // Preenche preços dos itens
+    setQuoteItems((prev) =>
+      prev.map((item) => ({
+        ...item,
+        unitPrice: data.prices?.[item.materialName] ?? item.unitPrice,
+      }))
+    );
+    // Preenche fornecedor se encontrado (busca por nome)
+    if (data.supplierName && suppliers) {
+      const found = (suppliers as any[]).find((s) =>
+        s.name.toLowerCase().includes(data.supplierName!.toLowerCase())
+      );
+      if (found) setSupplierId(found.id.toString());
+    }
+    if (data.deliveryDays) setDeliveryDays(data.deliveryDays);
+    if (data.freightCost) setFreightCost(data.freightCost);
+    if (data.notes) setQuoteNotes((prev) => prev ? `${prev}\n${data.notes}` : data.notes!);
   }
 
   function handleCreateQuote() {
@@ -248,12 +391,26 @@ export function ComprasDetail() {
         </CardContent>
       </Card>
 
+      {/* Modal Adicionar Cotação com OCR */}
       <Dialog open={showQuoteModal} onOpenChange={setShowQuoteModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Adicionar Cotação</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+
+            {/* OCR — leitura automática do orçamento */}
+            <OcrUpload
+              itemNames={quoteItems.map((i) => i.materialName)}
+              onExtracted={handleOcrExtracted}
+            />
+
+            <div className="relative flex items-center gap-2">
+              <div className="flex-1 border-t" />
+              <span className="text-xs text-muted-foreground">ou preencha manualmente</span>
+              <div className="flex-1 border-t" />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-2">
                 <Label>Fornecedor *</Label>
