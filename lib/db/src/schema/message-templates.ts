@@ -5,7 +5,7 @@ export const messageTemplatesTable = pgTable("message_templates", {
   name: text("name").notNull(),
   description: text("description"),
   template: text("template").notNull(),
-  label: text("label"),                                          // ← etiqueta/categoria
+  label: text("label"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
