@@ -1,0 +1,3 @@
+git add .
+git commit -m "Adiciona favicon"
+git push origin main
