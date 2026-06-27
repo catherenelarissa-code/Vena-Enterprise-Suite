@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Link } from "wouter";
 import {
   useListPurchaseRequests, getListPurchaseRequestsQueryKey,
-  useCreatePurchaseRequest, useDeletePurchaseRequest,
+  useCreatePurchaseRequest,
 } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -197,7 +197,7 @@ export function Compras() {
   const queryClient = useQueryClient();
   const { data: requests, isLoading } = useListPurchaseRequests({}, { query: { queryKey: getListPurchaseRequestsQueryKey() } });
   const { mutate: createRequest, isPending } = useCreatePurchaseRequest();
-  const { mutate: deleteRequest, isPending: isDeleting } = useDeletePurchaseRequest();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Separa solicitações por status
   const solicitacoes = requests?.filter(r => !['ordered','delivered'].includes(r.status)) ?? [];
@@ -215,15 +215,22 @@ export function Compras() {
     setItems([{ materialName: "", quantity: "", unit: "un", notes: "" }]);
   }
 
-  function handleDelete(id: number) {
-    deleteRequest({ id }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListPurchaseRequestsQueryKey() });
-        setDeleteConfirm(null);
-        toast.success("Solicitação excluída.");
-      },
-      onError: () => toast.error("Erro ao excluir solicitação."),
-    });
+  async function handleDelete(id: number) {
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/purchases/requests/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Erro ao excluir");
+      queryClient.invalidateQueries({ queryKey: getListPurchaseRequestsQueryKey() });
+      setDeleteConfirm(null);
+      toast.success("Solicitação excluída.");
+    } catch {
+      toast.error("Erro ao excluir solicitação.");
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   function handleSubmit() {
