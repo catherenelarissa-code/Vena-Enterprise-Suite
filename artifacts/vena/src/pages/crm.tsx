@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,41 @@ export function CRM() {
   const [loading, setLoading] = useState(true);
   const [dragging, setDragging] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+
+  // Drag-to-scroll do board (arrastar com o mouse em vez de usar a scrollbar)
+  const boardRef = useRef<HTMLDivElement>(null);
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, scrollLeft: 0 });
+  const movedWhilePanning = useRef(false);
+
+  function handleBoardMouseDown(e: React.MouseEvent) {
+    // Não inicia o pan se o clique começou em um card (que tem seu próprio drag) ou em um botão/input
+    const target = e.target as HTMLElement;
+    if (target.closest('[draggable="true"], button, input, select, textarea')) return;
+    if (!boardRef.current) return;
+    isPanning.current = true;
+    movedWhilePanning.current = false;
+    panStart.current = { x: e.clientX, scrollLeft: boardRef.current.scrollLeft };
+  }
+
+  function handleBoardMouseMove(e: React.MouseEvent) {
+    if (!isPanning.current || !boardRef.current) return;
+    const dx = e.clientX - panStart.current.x;
+    if (Math.abs(dx) > 3) movedWhilePanning.current = true;
+    boardRef.current.scrollLeft = panStart.current.scrollLeft - dx;
+  }
+
+  function endBoardPan() {
+    isPanning.current = false;
+  }
+
+  // Evita que o clique no card abra o modal de detalhe quando o usuário só estava arrastando o board
+  function handleBoardClickCapture(e: React.MouseEvent) {
+    if (movedWhilePanning.current) {
+      e.stopPropagation();
+      movedWhilePanning.current = false;
+    }
+  }
 
   // Modais
   const [openNewClient, setOpenNewClient] = useState(false);
@@ -153,7 +188,16 @@ export function CRM() {
       {loading ? (
         <div className="text-white/30 text-center py-20">Carregando...</div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div
+          ref={boardRef}
+          onMouseDown={handleBoardMouseDown}
+          onMouseMove={handleBoardMouseMove}
+          onMouseUp={endBoardPan}
+          onMouseLeave={endBoardPan}
+          onClickCapture={handleBoardClickCapture}
+          className="flex gap-4 overflow-x-auto pb-4 select-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ cursor: "grab" }}
+        >
           {columns.map(col => {
             const colClients = clients.filter(c => c.column_id === col.id);
             return (
