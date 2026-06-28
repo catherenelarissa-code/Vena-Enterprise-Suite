@@ -4,6 +4,7 @@ import { useGetMe, getGetMeQueryKey, useLogout } from "@workspace/api-client-rea
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "./ui/button";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
@@ -106,6 +107,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
               <p className="text-sm font-medium text-white truncate">{user?.name || "Usuário"}</p>
               <p className="text-xs text-white/40 capitalize">{user?.role || "Role"}</p>
             </div>
+            <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={handleLogout} 
               className="text-white/40 hover:text-white hover:bg-white/5 shrink-0 h-7 w-7">
               <LogOut className="h-3.5 w-3.5" />
@@ -121,9 +123,10 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="-ml-2 mr-2 text-white/60">
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="flex items-center gap-2 font-bold text-white">
+          <div className="flex items-center gap-2 font-bold text-white flex-1">
             vena <div className="h-2 w-2 rounded-full bg-orange-400" />
           </div>
+          <ThemeToggle />
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
