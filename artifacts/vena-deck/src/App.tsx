@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import 
+import { useLocation } from "wouter";
 
 import { slides } from "@/slideLoader";
 
