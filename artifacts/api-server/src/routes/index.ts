@@ -9,9 +9,9 @@ import projectsRouter from "./projects";
 import materialsRouter from "./materials";
 import priceMonitorRouter from "./price-monitor";
 import automationRouter from "./automation";
+import crmRouter from "./crm";
 
 const router: IRouter = Router();
-
 router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/dashboard", dashboardRouter);
@@ -22,5 +22,6 @@ router.use("/projects", projectsRouter);
 router.use("/materials", materialsRouter);
 router.use("/price-monitor", priceMonitorRouter);
 router.use("/automation", automationRouter);
+router.use("/crm", crmRouter);
 
 export default router;
