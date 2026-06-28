@@ -22,6 +22,7 @@ import { FornecedorDetail } from "@/pages/fornecedor-detail";
 import { ObraDetail } from "@/pages/obra-detail";
 import { Automacao } from "@/pages/automacao";
 import { CRM } from "@/pages/crm";
+import { Agenda } from "@/pages/agenda";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -108,6 +109,9 @@ function Router() {
         <div />
       </Route>
       <Route component={NotFound} />
+      <Route path="/agenda">
+  <SidebarLayout><Agenda /></SidebarLayout>
+</Route>
     </Switch>
   );
 }
