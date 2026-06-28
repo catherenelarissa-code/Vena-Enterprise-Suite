@@ -12,6 +12,7 @@ import automationRouter from "./automation";
 import crmRouter from "./crm";
 
 const router: IRouter = Router();
+
 router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/dashboard", dashboardRouter);
