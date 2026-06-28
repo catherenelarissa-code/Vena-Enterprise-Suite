@@ -8,3 +8,4 @@ export * from "./financial";
 export * from "./price-monitor";
 export * from "./alerts";
 export * from "./message-templates";
+export * from "./crm";
