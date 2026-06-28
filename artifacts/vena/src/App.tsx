@@ -102,6 +102,9 @@ function Router() {
       <Route path="/crm">
         <SidebarLayout><CRM /></SidebarLayout>
       </Route>
+      <Route path="/agenda">
+        <SidebarLayout><Agenda /></SidebarLayout>
+      </Route>
       <Route path="/admin">
         <SidebarLayout><Admin /></SidebarLayout>
       </Route>
@@ -109,9 +112,6 @@ function Router() {
         <div />
       </Route>
       <Route component={NotFound} />
-      <Route path="/agenda">
-  <SidebarLayout><Agenda /></SidebarLayout>
-</Route>
     </Switch>
   );
 }
