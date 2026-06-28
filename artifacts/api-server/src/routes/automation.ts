@@ -5,35 +5,43 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 async function callGemini(prompt: string, imageBase64?: string, mediaType?: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error("GROQ_API_KEY não configurada");
 
-  const parts: any[] = [];
+  const userContent: any[] = [];
 
   if (imageBase64 && mediaType) {
-    parts.push({ inline_data: { mime_type: mediaType, data: imageBase64 } });
+    userContent.push({
+      type: "image_url",
+      image_url: { url: `data:${mediaType};base64,${imageBase64}` }
+    });
   }
-  parts.push({ text: prompt });
+  userContent.push({ type: "text", text: prompt });
 
-  const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  const res = await fetch(GROQ_API_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
     body: JSON.stringify({
-      contents: [{ parts }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      messages: [{ role: "user", content: userContent }],
+      temperature: 0.1,
+      max_tokens: 2048,
     }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message ?? `Gemini error ${res.status}`);
+    throw new Error(err?.error?.message ?? `Groq error ${res.status}`);
   }
 
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  return data.choices?.[0]?.message?.content ?? "";
 }
 
 function parseJson(text: string): any {
