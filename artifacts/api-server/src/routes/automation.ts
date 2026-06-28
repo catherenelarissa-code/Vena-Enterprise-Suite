@@ -2,23 +2,57 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { messageTemplatesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import Anthropic from "@anthropic-ai/sdk";
 
 const router = Router();
+
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+
+async function callGemini(prompt: string, imageBase64?: string, mediaType?: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
+
+  const parts: any[] = [];
+
+  if (imageBase64 && mediaType) {
+    parts.push({ inline_data: { mime_type: mediaType, data: imageBase64 } });
+  }
+  parts.push({ text: prompt });
+
+  const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? `Gemini error ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+}
+
+function parseJson(text: string): any {
+  const clean = text.replace(/```json|```/g, "").trim();
+  try { return JSON.parse(clean); } catch {
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error("Resposta da IA não é um JSON válido");
+  }
+}
 
 router.get("/ping", async (req, res) => {
   return res.json({ ok: true, timestamp: new Date().toISOString() });
 });
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 // GET /api/automation/templates
 router.get("/templates", async (req, res) => {
   try {
-    const templates = await db
-      .select()
-      .from(messageTemplatesTable)
-      .orderBy(messageTemplatesTable.name);
+    const templates = await db.select().from(messageTemplatesTable).orderBy(messageTemplatesTable.name);
     return res.json(templates);
   } catch (err) {
     console.error(err);
@@ -30,13 +64,8 @@ router.get("/templates", async (req, res) => {
 router.post("/templates", async (req, res) => {
   try {
     const { name, description, template, label } = req.body;
-    if (!name || !template) {
-      return res.status(400).json({ error: "Nome e template são obrigatórios" });
-    }
-    const [created] = await db
-      .insert(messageTemplatesTable)
-      .values({ name, description, template, label: label || null })
-      .returning();
+    if (!name || !template) return res.status(400).json({ error: "Nome e template são obrigatórios" });
+    const [created] = await db.insert(messageTemplatesTable).values({ name, description, template, label: label || null }).returning();
     return res.status(201).json(created);
   } catch (err) {
     console.error(err);
@@ -54,7 +83,6 @@ router.patch("/templates/:id", async (req, res) => {
     if (description !== undefined) updates.description = description;
     if (template !== undefined) updates.template = template;
     if (label !== undefined) updates.label = label || null;
-
     await db.update(messageTemplatesTable).set(updates).where(eq(messageTemplatesTable.id, id));
     const [updated] = await db.select().from(messageTemplatesTable).where(eq(messageTemplatesTable.id, id));
     return res.json(updated);
@@ -79,24 +107,13 @@ router.delete("/templates/:id", async (req, res) => {
 router.post("/ocr", async (req, res) => {
   try {
     const { imageBase64, mediaType, templateFields } = req.body;
-    if (!imageBase64 || !mediaType) {
-      return res.status(400).json({ error: "Imagem é obrigatória" });
-    }
+    if (!imageBase64 || !mediaType) return res.status(400).json({ error: "Imagem é obrigatória" });
 
     const fieldsHint = templateFields?.length
       ? `Tente extrair especialmente os seguintes campos: ${templateFields.join(", ")}.`
       : "";
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-          {
-            type: "text",
-            text: `Analise esta imagem e extraia todas as informações relevantes como: nome do cliente, CPF/CNPJ, valor, data, endereço, potência, unidade, número do pedido, forma de pagamento, e qualquer outro dado importante. ${fieldsHint}
+    const prompt = `Analise esta imagem e extraia todas as informações relevantes como: nome do cliente, CPF/CNPJ, valor, data, endereço, potência, unidade, número do pedido, forma de pagamento. ${fieldsHint}
 
 Responda APENAS com um JSON válido no formato:
 {
@@ -114,159 +131,68 @@ Responda APENAS com um JSON válido no formato:
   },
   "resumo": "breve descrição do documento"
 }
+Não inclua markdown ou texto fora do JSON.`;
 
-Não inclua markdown, blocos de código ou texto fora do JSON.`,
-          },
-        ],
-      }],
-    });
-
-    const text = response.content.filter((b) => b.type === "text").map((b) => (b as any).text).join("");
-    let parsed;
-    try {
-      parsed = JSON.parse(text.trim());
-    } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) parsed = JSON.parse(match[0]);
-      else return res.status(500).json({ error: "Não foi possível interpretar a resposta da IA" });
-    }
-    return res.json(parsed);
+    const text = await callGemini(prompt, imageBase64, mediaType);
+    return res.json(parseJson(text));
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({ error: err.message ?? "Erro ao processar imagem" });
   }
 });
 
-// POST /api/automation/ocr-quote - OCR para leitura de orçamentos em Cotações
+// POST /api/automation/ocr-quote - OCR para cotações
 router.post("/ocr-quote", async (req, res) => {
   try {
     const { imageBase64, mediaType, itemNames } = req.body;
-    if (!imageBase64 || !mediaType) {
-      return res.status(400).json({ error: "Imagem é obrigatória" });
-    }
+    if (!imageBase64 || !mediaType) return res.status(400).json({ error: "Imagem é obrigatória" });
 
     const itemsHint = itemNames?.length
-      ? `Os itens da solicitação de compra são: ${itemNames.join(", ")}. Tente encontrar o preço unitário de cada um deles no orçamento.`
+      ? `Os itens da solicitação são: ${itemNames.join(", ")}. Tente encontrar o preço unitário de cada um.`
       : "Extraia todos os itens e preços que encontrar.";
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-          {
-            type: "text",
-            text: `Você está analisando um orçamento ou cotação de fornecedor. ${itemsHint}
+    const prompt = `Você está analisando um orçamento ou cotação de fornecedor. ${itemsHint}
 
-Extraia as seguintes informações do documento:
-- Nome do fornecedor/empresa
-- Prazo de entrega em dias (apenas o número)
-- Valor do frete em reais (apenas o número, sem R$)
-- Preço unitário de cada item listado
-- Observações relevantes (condições de pagamento, validade, etc)
+Extraia: nome do fornecedor, prazo de entrega em dias, valor do frete, preço unitário de cada item, observações.
 
-Responda APENAS com um JSON válido neste formato exato:
+Responda APENAS com JSON:
 {
-  "supplierName": "nome do fornecedor ou null",
-  "deliveryDays": "número de dias ou null",
-  "freightCost": "valor numérico do frete ou null",
+  "supplierName": "nome ou null",
+  "deliveryDays": "número ou null",
+  "freightCost": "valor numérico ou null",
   "notes": "observações ou null",
-  "prices": {
-    "nome exato do item": "preço unitário numérico"
-  }
+  "prices": { "nome do item": "preço unitário numérico" }
 }
+Não inclua R$, unidades ou texto nos valores numéricos. Não inclua markdown.`;
 
-Exemplos de prices: { "Cabo 10mm²": "12.50", "Disjuntor 63A": "45.00" }
-Não inclua R$, unidades ou texto nos valores numéricos.
-Não inclua markdown, blocos de código ou texto fora do JSON.`,
-          },
-        ],
-      }],
-    });
-
-    const text = response.content.filter((b) => b.type === "text").map((b) => (b as any).text).join("");
-    let parsed;
-    try {
-      parsed = JSON.parse(text.trim());
-    } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) parsed = JSON.parse(match[0]);
-      else return res.status(500).json({ error: "Não foi possível interpretar a resposta da IA" });
-    }
-
-    return res.json(parsed);
+    const text = await callGemini(prompt, imageBase64, mediaType);
+    return res.json(parseJson(text));
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({ error: err.message ?? "Erro ao processar orçamento" });
   }
 });
 
-// POST /api/automation/ocr-materials - OCR para extração de lista de materiais em Solicitações
+// POST /api/automation/ocr-materials - OCR para lista de materiais
 router.post("/ocr-materials", async (req, res) => {
   try {
     const { imageBase64, mediaType } = req.body;
-    if (!imageBase64 || !mediaType) {
-      return res.status(400).json({ error: "Imagem é obrigatória" });
-    }
+    if (!imageBase64 || !mediaType) return res.status(400).json({ error: "Imagem é obrigatória" });
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2048,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-          {
-            type: "text",
-            text: `Você está analisando um documento que pode ser uma lista de materiais, orçamento, nota fiscal ou qualquer documento com itens de compra.
+    const prompt = `Você está analisando um documento com itens de compra (lista de materiais, orçamento, nota fiscal).
 
-Extraia TODOS os itens/materiais listados no documento com suas respectivas quantidades e unidades de medida.
+Extraia TODOS os itens com suas quantidades e unidades. Use apenas estas unidades: un, m, m², kg, cx, rolo, pç, lt. Se não souber a unidade use "un". Se não souber a quantidade use "1".
 
-Para a unidade, use apenas: un, m, m², kg, cx, rolo, pç, lt
-Se a unidade não estiver clara, use "un".
-Se a quantidade não estiver clara, use "1".
-
-Responda APENAS com um JSON válido neste formato exato:
+Responda APENAS com JSON:
 {
   "items": [
-    {
-      "materialName": "nome do material",
-      "quantity": "quantidade numérica",
-      "unit": "unidade",
-      "notes": "observação se houver ou vazio"
-    }
+    { "materialName": "nome do material", "quantity": "número", "unit": "unidade", "notes": "" }
   ]
 }
+Não inclua markdown. Se não encontrar itens retorne { "items": [] }.`;
 
-Exemplos:
-{
-  "items": [
-    { "materialName": "Cabo PP 2x2,5mm²", "quantity": "50", "unit": "m", "notes": "" },
-    { "materialName": "Disjuntor 63A bifásico", "quantity": "2", "unit": "un", "notes": "tipo DIN" },
-    { "materialName": "Caixa de passagem 4x4", "quantity": "10", "unit": "un", "notes": "" }
-  ]
-}
-
-Não inclua markdown, blocos de código ou texto fora do JSON.
-Se não encontrar nenhum item, retorne { "items": [] }.`,
-          },
-        ],
-      }],
-    });
-
-    const text = response.content.filter((b) => b.type === "text").map((b) => (b as any).text).join("");
-    let parsed;
-    try {
-      parsed = JSON.parse(text.trim());
-    } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) parsed = JSON.parse(match[0]);
-      else return res.status(500).json({ error: "Não foi possível interpretar a resposta da IA" });
-    }
-
-    return res.json(parsed);
+    const text = await callGemini(prompt, imageBase64, mediaType);
+    return res.json(parseJson(text));
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({ error: err.message ?? "Erro ao processar materiais" });
