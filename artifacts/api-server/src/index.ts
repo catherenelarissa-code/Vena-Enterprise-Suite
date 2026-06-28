@@ -1,3 +1,6 @@
+import agendaRouter from "./agenda";
+// ...
+router.use("/agenda", agendaRouter);
 import app from "./app";
 import { logger } from "./lib/logger";
 
