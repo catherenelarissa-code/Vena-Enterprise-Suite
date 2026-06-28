@@ -1,6 +1,3 @@
-// lib/db/src/schema/financial.ts
-// Substitua o arquivo inteiro
-
 import { pgTable, serial, text, timestamp, numeric, integer, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
