@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useLocation, Link } from "wouter";
-import { useLogin } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
@@ -15,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { AuthShell, AuthLogo } from "@/components/AuthBackdrop";
+
+const RAILWAY = "https://workspaceapi-server-production-783e.up.railway.app";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "E-mail corporativo inválido" }),
@@ -34,7 +35,7 @@ const MOTIVATIONAL_PHRASES = [
 export function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const loginMutation = useLogin();
+  const [isPending, setIsPending] = useState(false);
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -54,29 +55,41 @@ export function Login() {
   });
 
   const onSubmit = async (data: z.infer<typeof loginSchema>) => {
-    loginMutation.mutate(
-      { data: { email: data.email, password: data.password } },
-      {
-        onSuccess: () => {
-          // FIX: pequeno delay para garantir que a sessão foi salva
-          setTimeout(() => setLocation("/dashboard"), 100);
-        },
-        onError: () => {
-          toast({
-            variant: "destructive",
-            title: "Erro de autenticação",
-            description: "E-mail ou senha incorretos.",
-          });
-        },
+    setIsPending(true);
+    try {
+      // Chama Railway diretamente para evitar problemas de cookie cross-domain via Vercel
+      const res = await fetch(`${RAILWAY}/api/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: data.email, password: data.password }),
+      });
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Erro de autenticação",
+          description: "E-mail ou senha incorretos.",
+        });
+        return;
       }
-    );
+      // Aguarda sessão ser salva e redireciona
+      setTimeout(() => setLocation("/dashboard"), 200);
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Erro de conexão",
+        description: "Não foi possível conectar ao servidor.",
+      });
+    } finally {
+      setIsPending(false);
+    }
   };
 
   async function handleForgotPassword() {
     if (!forgotEmail) { toast({ variant: "destructive", title: "Informe seu e-mail." }); return; }
     setForgotLoading(true);
     try {
-      const res = await fetch("/api/auth/forgot-password", {
+      const res = await fetch(`${RAILWAY}/api/auth/forgot-password`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -174,7 +187,7 @@ export function Login() {
 
           <button
             type="submit"
-            disabled={loginMutation.isPending}
+            disabled={isPending}
             className="group relative w-full overflow-hidden rounded-lg px-4 py-3 text-sm font-semibold tracking-wide transition-all active:scale-[0.98] disabled:opacity-60"
             style={{
               background: "linear-gradient(135deg, var(--brand-orange) 0%, var(--brand-orange-strong) 100%)",
@@ -183,13 +196,13 @@ export function Login() {
             }}
           >
             <span className="relative z-10">
-              {loginMutation.isPending ? "Autenticando..." : "Entrar na plataforma"}
+              {isPending ? "Autenticando..." : "Entrar na plataforma"}
             </span>
           </button>
 
           <div className="flex items-center gap-3 py-1">
             <div className="h-px flex-1" style={{ background: "var(--auth-bg-border)" }} />
-            <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: "rgba(180,200,185,0.5)" }}>ou</span>
+            <span className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "rgba(180,200,185,0.5)" }}>ou</span>
             <div className="h-px flex-1" style={{ background: "var(--auth-bg-border)" }} />
           </div>
 
@@ -209,7 +222,6 @@ export function Login() {
         Vena Engenharia © {new Date().getFullYear()}
       </p>
 
-      {/* Modal Esqueci Minha Senha */}
       <Dialog open={showForgot} onOpenChange={setShowForgot}>
         <DialogContent className="sm:max-w-sm border-white/10" style={{ background: "hsl(220,25%,11%)" }}>
           <DialogHeader>
