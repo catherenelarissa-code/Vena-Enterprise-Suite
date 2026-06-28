@@ -7,7 +7,6 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
-
 const PgSession = pgSession(session);
 
 app.use(
@@ -26,14 +25,14 @@ app.use(cors({
 }));
 
 app.set("trust proxy", true);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use(session({
   store: new PgSession({
     conString: process.env.DATABASE_URL,
     tableName: "user_sessions",
-    createTableIfMissing: true,
+    // createTableIfMissing removido — tabela já existe no banco
   }),
   secret: process.env.SESSION_SECRET ?? "vena-dev-secret",
   resave: false,
@@ -47,5 +46,4 @@ app.use(session({
 }));
 
 app.use("/api", router);
-
 export default app;
