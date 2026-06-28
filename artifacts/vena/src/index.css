@@ -156,3 +156,101 @@
     min-height: 100vh;
   }
 }
+/* ============================================================
+   Tema de autenticação (login / request-access / set-password)
+   — tokens e animações trazidos do protótipo Lovable.
+   Usa os mesmos tons de verde/laranja já definidos em :root acima.
+   ============================================================ */
+
+:root {
+  --brand-green: #1F7A57;
+  --brand-green-hover: #2A8F66;
+  --brand-green-light: #43B97A;
+  --brand-neon: #8FD94B;
+  --brand-orange: #F58A1F;
+  --brand-orange-strong: #FF8C00;
+  --brand-orange-hover: #FFA726;
+  --brand-orange-light: #FFB74D;
+
+  --auth-bg-base: #07110D;
+  --auth-bg-secondary: #0C1814;
+  --auth-bg-card: #10211A;
+  --auth-bg-border: #1C3A2E;
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+
+  --gradient-hero: radial-gradient(ellipse at 20% 10%, rgba(31,122,87,0.35), transparent 55%),
+                   radial-gradient(ellipse at 90% 90%, rgba(245,138,31,0.18), transparent 50%),
+                   linear-gradient(160deg, #07110D 0%, #0C1814 60%, #07110D 100%);
+  --shadow-glow-green: 0 0 24px rgba(143,217,75,0.35), 0 0 60px rgba(31,122,87,0.25);
+  --shadow-glow-orange: 0 0 20px rgba(245,138,31,0.45), 0 0 50px rgba(255,140,0,0.25);
+  --shadow-card: 0 30px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(143,217,75,0.06);
+}
+
+/* === Electrical schematic animation === */
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes pulse-node {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); filter: drop-shadow(0 0 2px var(--brand-neon)); }
+  50% { opacity: 1; transform: scale(1.15); filter: drop-shadow(0 0 8px var(--brand-neon)); }
+}
+@keyframes spark {
+  0% { stroke-dashoffset: 200; opacity: 0; }
+  10% { opacity: 1; }
+  100% { stroke-dashoffset: -200; opacity: 0; }
+}
+@keyframes float-grid {
+  0%, 100% { transform: translate3d(0,0,0); }
+  50% { transform: translate3d(-8px,-8px,0); }
+}
+@keyframes glow-soft {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+@keyframes form-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.schematic-trace {
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  animation: draw 3.2s ease-out forwards;
+}
+.schematic-node {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: pulse-node 2.4s ease-in-out infinite;
+  opacity: 0;
+  animation-fill-mode: forwards;
+}
+.schematic-spark {
+  stroke-dasharray: 12 200;
+  animation: spark 3s linear infinite;
+}
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(143,217,75,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(143,217,75,0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  animation: float-grid 14s ease-in-out infinite;
+}
+.glow-orb {
+  animation: glow-soft 5s ease-in-out infinite;
+}
+.fade-up { animation: form-in 0.7s ease-out both; }
+
+.brand-input {
+  background: rgba(12,24,20,0.7);
+  border: 1px solid var(--auth-bg-border);
+  color: #fff;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+}
+.brand-input::placeholder { color: rgba(180,200,185,0.45); }
+.brand-input:focus {
+  outline: none;
+  border-color: var(--brand-neon);
+  box-shadow: 0 0 0 3px rgba(143,217,75,0.15);
+  background: rgba(12,24,20,0.95);
+}
