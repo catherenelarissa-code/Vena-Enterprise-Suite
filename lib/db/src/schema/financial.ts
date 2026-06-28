@@ -1,26 +1,52 @@
-import { pgTable, serial, text, timestamp, numeric, integer, pgEnum } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
-import { projectsTable } from "./projects";
-import { suppliersTable } from "./suppliers";
+/app # cat /app/artifacts/vena/src/pages/crm.tsx | head -50
+import { useState, useEffect, useRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Settings, Phone, Mail, FileText, Clock, User, Trash2, Edit, GripVertical, X } from "lucide-react";
+import { setBaseUrl } from "@workspace/api-client-react";
 
-export const financialTypeEnum = pgEnum("financial_type", ["payable", "receivable"]);
-export const financialStatusEnum = pgEnum("financial_status", ["pending", "paid", "overdue", "cancelled"]);
+setBaseUrl(import.meta.env.VITE_API_URL ?? "");
 
-export const financialAccountsTable = pgTable("financial_accounts", {
-  id: serial("id").primaryKey(),
-  type: financialTypeEnum("type").notNull(),
-  description: text("description").notNull(),
-  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
-  dueDate: text("due_date").notNull(),
-  paidAt: timestamp("paid_at"),
-  status: financialStatusEnum("status").notNull().default("pending"),
-  projectId: integer("project_id").references(() => projectsTable.id),
-  supplierId: integer("supplier_id").references(() => suppliersTable.id),
-  category: text("category"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+type Column = { id: number; name: string; color: string; position: number };
+type Client = {
+  id: number; name: string; phone?: string; email?: string;
+  cpf_cnpj?: string; address?: string; origin?: string; notes?: string;
+  column_id: number; position: number; column_name?: string; column_color?: string;
+};
+type HistoryEntry = { id: number; type: string; description: string; created_at: string; user_name?: string };
 
-export const insertFinancialAccountSchema = createInsertSchema(financialAccountsTable).omit({ id: true, createdAt: true });
-export type InsertFinancialAccount = z.infer<typeof insertFinancialAccountSchema>;
-export type FinancialAccount = typeof financialAccountsTable.$inferSelect;
+const API = import.meta.env.VITE_API_URL ?? "";
+
+async function apiFetch(path: string, options?: RequestInit) {
+  const res = await fetch(`${API}/api/crm${path}`, {
+    ...options,
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export function CRM() {
+  const [columns, setColumns] = useState<Column[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
+  // Drag-to-scroll do board (arrastar com o mouse em vez de usar a scrollbar)
+  const boardRef = useRef<HTMLDivElement>(null);
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, scrollLeft: 0 });
+  const movedWhilePanning = useRef(false);
+
+  function handleBoardMouseDown(e: React.MouseEvent) {
+    // Não inicia o pan se o clique começou em um card (que tem seu próprio drag) ou em um botão/input
+    const target = e.target as HTMLElement;
+    if (target.closest('[draggable="true"], button, input, select, textarea')) return;
+/app # 
