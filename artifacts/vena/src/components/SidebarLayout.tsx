@@ -1,3 +1,4 @@
+import { ..., Users2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useGetMe, getGetMeQueryKey, useLogout } from "@workspace/api-client-react";
 import { 
