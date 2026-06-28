@@ -395,6 +395,119 @@ function LinksModal({ product, onClose, onSaved }: { product: Product; onClose: 
   );
 }
 
+// ── Atualização Rápida de Preço ───────────────────────────────────────────────
+
+function QuickPriceLinks({ productId, links, onSaved }: {
+  productId: number;
+  links: ProductLink[];
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState<number | null>(null);
+  const [priceInput, setPriceInput] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const sorted = [...links]
+    .sort((a, b) => {
+      if (a.currentPrice === null) return 1;
+      if (b.currentPrice === null) return -1;
+      return a.currentPrice - b.currentPrice;
+    });
+
+  async function handleSavePrice(linkId: number) {
+    const price = parseFloat(priceInput.replace(",", "."));
+    if (isNaN(price) || price <= 0) { toast.error("Preço inválido."); return; }
+    setIsSaving(true);
+    try {
+      await apiCall(`/products/${productId}/links/${linkId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ currentPrice: price }),
+      });
+      toast.success("Preço atualizado!");
+      setEditing(null);
+      setPriceInput("");
+      onSaved();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {sorted.slice(0, 4).map((link, idx) => (
+        <div key={link.id} className="text-xs">
+          {editing === link.id ? (
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-muted-foreground flex-1 min-w-0">{link.supplierName}</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-muted-foreground">R$</span>
+                <input
+                  autoFocus
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="w-20 h-6 px-1.5 rounded border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                  value={priceInput}
+                  onChange={e => setPriceInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") handleSavePrice(link.id);
+                    if (e.key === "Escape") { setEditing(null); setPriceInput(""); }
+                  }}
+                />
+                <button
+                  onClick={() => handleSavePrice(link.id)}
+                  disabled={isSaving}
+                  className="h-6 px-1.5 rounded bg-primary text-primary-foreground text-xs hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isSaving ? "..." : "✓"}
+                </button>
+                <button
+                  onClick={() => { setEditing(null); setPriceInput(""); }}
+                  className="h-6 px-1 rounded hover:bg-muted text-muted-foreground"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-1 group">
+              <div className="flex items-center gap-1.5 min-w-0">
+                {idx === 0 && link.currentPrice !== null && (
+                  <Crown className="h-3 w-3 text-amber-500 shrink-0" />
+                )}
+                <a href={link.url} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline truncate flex items-center gap-1">
+                  {link.supplierName}
+                  <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                </a>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className={`font-medium ${idx === 0 && link.currentPrice !== null ? "text-secondary" : "text-muted-foreground"}`}>
+                  {link.currentPrice !== null ? formatCurrency(link.currentPrice) : "—"}
+                </span>
+                <button
+                  onClick={() => {
+                    setEditing(link.id);
+                    setPriceInput(link.currentPrice?.toString() ?? "");
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 rounded hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                  title="Atualizar preço"
+                >
+                  <Pencil className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+      {links.length > 4 && (
+        <p className="text-xs text-muted-foreground">+{links.length - 4} links</p>
+      )}
+    </div>
+  );
+}
+
 // ── Card de Produto ───────────────────────────────────────────────────────────
 
 function ProductCard({ product, onRefresh }: { product: Product; onRefresh: () => void }) {
@@ -460,32 +573,11 @@ function ProductCard({ product, onRefresh }: { product: Product; onRefresh: () =
             ))}
           </div>
 
-          {/* Comparação de links */}
+          {/* Comparação de links com atualização rápida */}
           {product.links && product.links.length > 0 && (
             <div className="pt-2 border-t border-border/50 space-y-1.5">
               <p className="text-xs font-medium text-muted-foreground">Comparação de preços</p>
-              {[...product.links]
-                .filter(l => l.currentPrice !== null)
-                .sort((a, b) => (a.currentPrice ?? 0) - (b.currentPrice ?? 0))
-                .slice(0, 3)
-                .map((link, idx) => (
-                  <div key={link.id} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {idx === 0 && <Crown className="h-3 w-3 text-amber-500 shrink-0" />}
-                      <a href={link.url} target="_blank" rel="noopener noreferrer"
-                        className="text-primary hover:underline truncate flex items-center gap-1">
-                        {link.supplierName}
-                        <ExternalLink className="h-2.5 w-2.5 shrink-0" />
-                      </a>
-                    </div>
-                    <span className={`font-medium shrink-0 ${idx === 0 ? "text-secondary" : ""}`}>
-                      {formatCurrency(link.currentPrice!)}
-                    </span>
-                  </div>
-                ))}
-              {product.links.length > 3 && (
-                <p className="text-xs text-muted-foreground">+{product.links.length - 3} links</p>
-              )}
+              <QuickPriceLinks productId={product.id} links={product.links} onSaved={onRefresh} />
             </div>
           )}
 
