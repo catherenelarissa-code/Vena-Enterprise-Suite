@@ -25,6 +25,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, color: "text-orange-400" },
     { name: "CRM", href: "/crm", icon: Users2, color: "text-purple-400" },
+    { name: "Agenda", href: "/agenda", icon: CalendarDays, color: "text-blue-400" },
     { name: "Compras", href: "/compras", icon: ShoppingCart, color: "text-green-400" },
     { name: "Fornecedores", href: "/fornecedores", icon: Truck, color: "text-blue-400" },
     { name: "Financeiro", href: "/financeiro", icon: DollarSign, color: "text-yellow-400" },
