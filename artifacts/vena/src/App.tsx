@@ -17,11 +17,11 @@ import { Materiais } from "@/pages/materiais";
 import { MonitorPrecos } from "@/pages/monitor-precos";
 import { Admin } from "@/pages/admin";
 import { Fornecedores } from "@/pages/fornecedores";
-
 import { ComprasDetail } from "@/pages/compras-detail";
 import { FornecedorDetail } from "@/pages/fornecedor-detail";
 import { ObraDetail } from "@/pages/obra-detail";
 import { Automacao } from "@/pages/automacao";
+import { CRM } from "@/pages/crm";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -96,8 +96,11 @@ function Router() {
         <SidebarLayout><MonitorPrecos /></SidebarLayout>
       </Route>
       <Route path="/automacao">
-  <SidebarLayout><Automacao /></SidebarLayout>
-</Route>
+        <SidebarLayout><Automacao /></SidebarLayout>
+      </Route>
+      <Route path="/crm">
+        <SidebarLayout><CRM /></SidebarLayout>
+      </Route>
       <Route path="/admin">
         <SidebarLayout><Admin /></SidebarLayout>
       </Route>
