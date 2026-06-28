@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-impot { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useLocation, Link } from "wouter";
 import { useRequestAccess } from "@workspace/api-client-react";
