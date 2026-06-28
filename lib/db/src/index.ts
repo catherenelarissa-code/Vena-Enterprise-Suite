@@ -1,6 +1,5 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-export * from "./crm";
 import * as schema from "./schema";
 
 const { Pool } = pg;
