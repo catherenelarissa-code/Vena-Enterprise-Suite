@@ -4,6 +4,7 @@ import { useGetMe, getGetMeQueryKey, useLogout } from "@workspace/api-client-rea
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "./ui/button";
+import { ..., CalendarDays } from "lucide-react";
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
