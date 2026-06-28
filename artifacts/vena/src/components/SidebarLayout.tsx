@@ -1,4 +1,4 @@
-import { ..., Users2 } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Truck, DollarSign, HardHat, Package, TrendingDown, Users, LogOut, Menu, Bot, Zap, Users2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useGetMe, getGetMeQueryKey, useLogout } from "@workspace/api-client-react";
 import { 
