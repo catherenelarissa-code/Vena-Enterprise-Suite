@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calendar, Clock, CheckCircle2, Circle, AlertTriangle, Trash2, ChevronLeft, ChevronRight, ListTodo } from "lucide-react";
+import { Plus, Calendar, Clock, CheckCircle2, Circle, AlertTriangle, Trash2, ChevronLeft, ChevronRight, ListTodo, User } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
@@ -20,19 +20,30 @@ async function apiFetch(path: string, options?: RequestInit) {
   return res.json();
 }
 
+async function authFetch(path: string) {
+  const res = await fetch(`${API}/api/auth${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 type Task = {
   id: number; title: string; description?: string;
   priority: "baixa" | "media" | "alta" | "urgente";
   status: "pendente" | "em_andamento" | "concluida" | "cancelada";
-  due_date?: string; assigned_name?: string; client_name?: string;
+  due_date?: string; assigned_to?: number; assigned_name?: string; client_name?: string;
 };
 
 type Appointment = {
   id: number; title: string; description?: string;
   start_time: string; end_time?: string;
   priority: "baixa" | "media" | "alta" | "urgente";
-  type: string; client_name?: string; project_name?: string;
+  type: string; assigned_to?: number; assigned_name?: string; client_name?: string; project_name?: string;
 };
+
+type UserOption = { id: number; name: string };
 
 const PRIORITY_CONFIG = {
   urgente: { label: "Urgente", color: "bg-red-500/10 text-red-400 border-red-500/20", dot: "bg-red-400" },
@@ -50,42 +61,67 @@ const STATUS_CONFIG = {
 
 const APPOINTMENT_TYPES = ["reuniao", "visita", "ligacao", "entrega", "vistoria", "outro"];
 
+const UNASSIGNED = "none";
+
 export function Agenda() {
   const [view, setView] = useState<"calendario" | "timeline" | "tarefas">("tarefas");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Filtro: "all" = todo mundo, ou o id do usuário cuja agenda queremos ver
+  const [agendaFilter, setAgendaFilter] = useState<string>("all");
 
   const [openNewTask, setOpenNewTask] = useState(false);
   const [openNewAppointment, setOpenNewAppointment] = useState(false);
 
-  const [taskForm, setTaskForm] = useState({ title: "", description: "", priority: "media", due_date: "" });
-  const [appointmentForm, setAppointmentForm] = useState({ title: "", description: "", start_time: "", end_time: "", priority: "media", type: "reuniao" });
+  const [taskForm, setTaskForm] = useState({ title: "", description: "", priority: "media", due_date: "", assigned_to: UNASSIGNED });
+  const [appointmentForm, setAppointmentForm] = useState({ title: "", description: "", start_time: "", end_time: "", priority: "media", type: "reuniao", assigned_to: UNASSIGNED });
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => { loadData(); }, [agendaFilter]);
+
+  async function loadUsers() {
+    try {
+      const u = await authFetch("/users");
+      setUsers(u.map((x: any) => ({ id: x.id, name: x.name })));
+    } catch (e) { console.error(e); }
+  }
 
   async function loadData() {
     setLoading(true);
     try {
-      const [t, a] = await Promise.all([apiFetch("/tasks"), apiFetch("/appointments")]);
+      const suffix = agendaFilter !== "all" ? `?assigned_to=${agendaFilter}` : "";
+      const [t, a] = await Promise.all([apiFetch(`/tasks${suffix}`), apiFetch(`/appointments${suffix}`)]);
       setTasks(t);
       setAppointments(a);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
 
+  function toApiAssignedTo(value: string) {
+    return value === UNASSIGNED ? null : Number(value);
+  }
+
   async function createTask() {
-    await apiFetch("/tasks", { method: "POST", body: JSON.stringify(taskForm) });
+    await apiFetch("/tasks", {
+      method: "POST",
+      body: JSON.stringify({ ...taskForm, assigned_to: toApiAssignedTo(taskForm.assigned_to) }),
+    });
     setOpenNewTask(false);
-    setTaskForm({ title: "", description: "", priority: "media", due_date: "" });
+    setTaskForm({ title: "", description: "", priority: "media", due_date: "", assigned_to: UNASSIGNED });
     loadData();
   }
 
   async function createAppointment() {
-    await apiFetch("/appointments", { method: "POST", body: JSON.stringify(appointmentForm) });
+    await apiFetch("/appointments", {
+      method: "POST",
+      body: JSON.stringify({ ...appointmentForm, assigned_to: toApiAssignedTo(appointmentForm.assigned_to) }),
+    });
     setOpenNewAppointment(false);
-    setAppointmentForm({ title: "", description: "", start_time: "", end_time: "", priority: "media", type: "reuniao" });
+    setAppointmentForm({ title: "", description: "", start_time: "", end_time: "", priority: "media", type: "reuniao", assigned_to: UNASSIGNED });
     loadData();
   }
 
@@ -124,7 +160,6 @@ export function Agenda() {
   const monthName = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   const urgentTasks = tasks.filter(t => t.priority === 'urgente' && t.status !== 'concluida' && t.status !== 'cancelada');
-  const pendingTasks = tasks.filter(t => t.status === 'pendente' || t.status === 'em_andamento');
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -135,6 +170,20 @@ export function Agenda() {
           <p className="text-white/50 text-sm mt-1">Tarefas, compromissos e linha do tempo</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Filtro: de quem é a agenda */}
+          <Select value={agendaFilter} onValueChange={setAgendaFilter}>
+            <SelectTrigger className="w-44 border-white/10 bg-white/5 text-white">
+              <div className="flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-white/40" />
+                <SelectValue />
+              </div>
+            </SelectTrigger>
+            <SelectContent style={{ background: "hsl(220,25%,13%)" }}>
+              <SelectItem value="all">Todos</SelectItem>
+              {users.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
           {/* Toggle de visão */}
           <div className="flex rounded-lg border border-white/10 overflow-hidden">
             {[
@@ -214,7 +263,11 @@ export function Agenda() {
                               </span>
                             )}
                             {task.client_name && <span className="text-xs text-white/30">👤 {task.client_name}</span>}
-                            {task.assigned_name && <span className="text-xs text-white/30">→ {task.assigned_name}</span>}
+                            {task.assigned_name && (
+                              <span className="text-xs text-blue-400/70 flex items-center gap-1">
+                                <User className="h-3 w-3" /> {task.assigned_name}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -325,6 +378,11 @@ export function Agenda() {
                           </span>
                           {appt.client_name && <span className="text-xs text-white/30">👤 {appt.client_name}</span>}
                           {appt.project_name && <span className="text-xs text-white/30">🏗️ {appt.project_name}</span>}
+                          {appt.assigned_name && (
+                            <span className="text-xs text-blue-400/70 flex items-center gap-1">
+                              <User className="h-3 w-3" /> {appt.assigned_name}
+                            </span>
+                          )}
                         </div>
                         {appt.description && <p className="text-xs text-white/40 mt-2">{appt.description}</p>}
                       </div>
@@ -376,6 +434,16 @@ export function Agenda() {
                 <Input type="datetime-local" value={taskForm.due_date} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))}
                   className="border-white/10 bg-white/5 text-white" />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-white/60 text-xs">Atribuir a</Label>
+              <Select value={taskForm.assigned_to} onValueChange={v => setTaskForm(f => ({ ...f, assigned_to: v }))}>
+                <SelectTrigger className="border-white/10 bg-white/5 text-white"><SelectValue /></SelectTrigger>
+                <SelectContent style={{ background: "hsl(220,25%,13%)" }}>
+                  <SelectItem value={UNASSIGNED}>Ninguém</SelectItem>
+                  {users.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
@@ -434,6 +502,16 @@ export function Agenda() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-white/60 text-xs">Atribuir a</Label>
+              <Select value={appointmentForm.assigned_to} onValueChange={v => setAppointmentForm(f => ({ ...f, assigned_to: v }))}>
+                <SelectTrigger className="border-white/10 bg-white/5 text-white"><SelectValue /></SelectTrigger>
+                <SelectContent style={{ background: "hsl(220,25%,13%)" }}>
+                  <SelectItem value={UNASSIGNED}>Ninguém</SelectItem>
+                  {users.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
