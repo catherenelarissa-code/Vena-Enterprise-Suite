@@ -1,10 +1,78 @@
+import { useState, useEffect } from "react";
 import { useGetDashboardSummary, getGetDashboardSummaryQueryKey, useGetDashboardCashFlow, getGetDashboardCashFlowQueryKey, useGetDashboardProjectsOverview, getGetDashboardProjectsOverviewQueryKey, useGetDashboardAlerts, getGetDashboardAlertsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
-import { DollarSign, AlertTriangle, Briefcase, PackageOpen, ArrowDownRight, TrendingUp, TrendingDown, CheckCircle2, Zap, Bell, Calendar, Clock } from "lucide-react";
+import { DollarSign, AlertTriangle, Briefcase, PackageOpen, ArrowDownRight, TrendingUp, TrendingDown, CheckCircle2, Zap, Bell, Calendar, Clock, ListTodo, CalendarClock, AlarmClock } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+
+const API = import.meta.env.VITE_API_URL ?? "";
+
+async function agendaFetch(path: string) {
+  const res = await fetch(`${API}/api/agenda${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+type Task = {
+  id: number; title: string; description?: string;
+  priority: "baixa" | "media" | "alta" | "urgente";
+  status: "pendente" | "em_andamento" | "concluida" | "cancelada";
+  due_date?: string; assigned_name?: string; client_name?: string;
+};
+
+type Appointment = {
+  id: number; title: string; description?: string;
+  start_time: string; end_time?: string;
+  priority: "baixa" | "media" | "alta" | "urgente";
+  type: string; client_name?: string; project_name?: string;
+};
+
+const PRIORITY_DOT: Record<string, string> = {
+  urgente: "bg-red-400",
+  alta: "bg-orange-400",
+  media: "bg-yellow-400",
+  baixa: "bg-green-400",
+};
+
+function isSameOrBeforeToday(dateStr?: string) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  return d.getTime() < today.getTime() - 24 * 60 * 60 * 1000 + 1; // estritamente antes de hoje (vencida)
+}
+
+function isOverdue(dateStr?: string) {
+  if (!dateStr) return false;
+  const due = new Date(dateStr);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  return due.getTime() < startOfToday.getTime();
+}
+
+function isTodayOrTomorrow(dateStr: string) {
+  const d = new Date(dateStr);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfTomorrow = new Date(startOfToday);
+  endOfTomorrow.setDate(endOfTomorrow.getDate() + 2);
+  return d.getTime() >= startOfToday.getTime() && d.getTime() < endOfTomorrow.getTime();
+}
+
+function isUpcomingDeadline(dateStr?: string) {
+  if (!dateStr) return false;
+  const due = new Date(dateStr);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const in3Days = new Date(startOfToday);
+  in3Days.setDate(in3Days.getDate() + 3);
+  return due.getTime() >= startOfToday.getTime() && due.getTime() < in3Days.getTime();
+}
 
 // Torre elétrica SVG
 function TowerIllustration() {
@@ -40,6 +108,41 @@ export function Dashboard() {
   const { data: cashFlow, isLoading: isLoadingCashFlow } = useGetDashboardCashFlow({ query: { queryKey: getGetDashboardCashFlowQueryKey() } });
   const { data: projects, isLoading: isLoadingProjects } = useGetDashboardProjectsOverview({ query: { queryKey: getGetDashboardProjectsOverviewQueryKey() } });
   const { data: alerts, isLoading: isLoadingAlerts } = useGetDashboardAlerts({ query: { queryKey: getGetDashboardAlertsQueryKey() } });
+
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoadingAgenda, setIsLoadingAgenda] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setIsLoadingAgenda(true);
+    Promise.all([agendaFetch("/tasks"), agendaFetch("/appointments")])
+      .then(([t, a]) => {
+        if (!active) return;
+        setTasks(t);
+        setAppointments(a);
+      })
+      .catch((e) => console.error(e))
+      .finally(() => { if (active) setIsLoadingAgenda(false); });
+    return () => { active = false; };
+  }, []);
+
+  const pendingTasks = tasks.filter(t => t.status !== "concluida" && t.status !== "cancelada");
+
+  const importantTasks = pendingTasks
+    .filter(t => t.priority === "urgente" || t.priority === "alta" || isUpcomingDeadline(t.due_date))
+    .sort((a, b) => {
+      const order: Record<string, number> = { urgente: 0, alta: 1, media: 2, baixa: 3 };
+      return order[a.priority] - order[b.priority];
+    })
+    .slice(0, 6);
+
+  const overdueTasks = pendingTasks.filter(t => isOverdue(t.due_date));
+
+  const upcomingAppointments = appointments
+    .filter(a => isTodayOrTomorrow(a.start_time))
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+    .slice(0, 6);
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -150,6 +253,127 @@ export function Dashboard() {
             </div>
           </>
         ) : null}
+      </div>
+
+      {/* Agenda: Tarefas Importantes | Próximos Compromissos | Atrasadas */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Tarefas Importantes */}
+        <Card className="border-white/5" style={{ background: "hsl(220,25%,10%)" }}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white text-base">
+              <ListTodo className="h-4.5 w-4.5 text-orange-400" />
+              Tarefas Importantes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingAgenda ? (
+              <div className="space-y-2">
+                {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : importantTasks.length > 0 ? (
+              <div className="space-y-2">
+                {importantTasks.map(task => (
+                  <div key={task.id} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-white/5" style={{ background: "hsl(220,25%,13%)" }}>
+                    <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${PRIORITY_DOT[task.priority]}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{task.title}</p>
+                      {task.due_date && (
+                        <p className="text-[11px] text-white/40 mt-0.5">
+                          {new Date(task.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-white/30">
+                <CheckCircle2 className="h-8 w-8 mb-2 opacity-40" />
+                <p className="text-xs">Nenhuma tarefa importante</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Próximos Compromissos */}
+        <Card className="border-white/5" style={{ background: "hsl(220,25%,10%)" }}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white text-base">
+              <CalendarClock className="h-4.5 w-4.5 text-blue-400" />
+              Próximos Compromissos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingAgenda ? (
+              <div className="space-y-2">
+                {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : upcomingAppointments.length > 0 ? (
+              <div className="space-y-2">
+                {upcomingAppointments.map(appt => {
+                  const d = new Date(appt.start_time);
+                  return (
+                    <div key={appt.id} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-white/5" style={{ background: "hsl(220,25%,13%)" }}>
+                      <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${PRIORITY_DOT[appt.priority]}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">{appt.title}</p>
+                        <p className="text-[11px] text-white/40 mt-0.5">
+                          {d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} · {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-white/30">
+                <Calendar className="h-8 w-8 mb-2 opacity-40" />
+                <p className="text-xs">Nada agendado para hoje/amanhã</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Atrasadas */}
+        <Card className="border-white/5" style={{ background: "hsl(220,25%,10%)" }}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white text-base">
+              <AlarmClock className="h-4.5 w-4.5 text-red-400" />
+              Atrasadas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingAgenda ? (
+              <div className="space-y-2">
+                {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : overdueTasks.length > 0 ? (
+              <div className="space-y-2">
+                {overdueTasks.slice(0, 6).map(task => (
+                  <div key={task.id} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-red-500/20" style={{ background: "rgba(239,68,68,0.05)" }}>
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-400 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{task.title}</p>
+                      {task.due_date && (
+                        <p className="text-[11px] text-red-400/70 mt-0.5">
+                          Venceu em {new Date(task.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {overdueTasks.length > 6 && (
+                  <p className="text-[11px] text-white/30 text-center pt-1">+{overdueTasks.length - 6} outras tarefas atrasadas</p>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-white/30">
+                <CheckCircle2 className="h-8 w-8 mb-2 opacity-40" />
+                <p className="text-xs">Nenhuma tarefa atrasada</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Fluxo de caixa + Alertas */}
