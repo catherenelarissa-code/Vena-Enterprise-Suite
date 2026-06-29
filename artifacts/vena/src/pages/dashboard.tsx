@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { useGetDashboardSummary, getGetDashboardSummaryQueryKey, useGetDashboardCashFlow, getGetDashboardCashFlowQueryKey, useGetDashboardProjectsOverview, getGetDashboardProjectsOverviewQueryKey, useGetDashboardAlerts, getGetDashboardAlertsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
-import { DollarSign, AlertTriangle, Briefcase, PackageOpen, ArrowDownRight, TrendingUp, TrendingDown, CheckCircle2, Zap, Bell, Calendar, Clock, ListTodo, CalendarClock, AlarmClock } from "lucide-react";
+import { DollarSign, AlertTriangle, Briefcase, PackageOpen, ArrowDownRight, TrendingUp, TrendingDown, CheckCircle2, Zap, Bell, Calendar, Clock, ListTodo, CalendarClock, AlarmClock, Plus, Users2, CalendarPlus } from "lucide-react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -315,6 +316,29 @@ export function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Ações Rápidas */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Nova Tarefa", href: "/agenda", icon: ListTodo, color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+          { label: "Novo Cliente", href: "/crm", icon: Users2, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+          { label: "Nova Conta", href: "/financeiro", icon: DollarSign, color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" },
+          { label: "Novo Compromisso", href: "/agenda", icon: CalendarPlus, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+        ].map((action) => (
+          <Link key={action.label} href={action.href}>
+            <div className={`flex items-center gap-3 p-3.5 rounded-xl border ${action.border} cursor-pointer hover:border-white/20 transition-all group`}
+              style={{ background: "hsl(220,25%,10%)" }}>
+              <div className={`flex items-center justify-center w-9 h-9 rounded-lg ${action.bg} shrink-0 group-hover:scale-105 transition-transform`}>
+                <action.icon className={`h-4 w-4 ${action.color}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">{action.label}</p>
+              </div>
+              <Plus className="h-3.5 w-3.5 text-white/20 shrink-0" />
+            </div>
+          </Link>
+        ))}
       </div>
 
       {/* Cards de resumo */}
