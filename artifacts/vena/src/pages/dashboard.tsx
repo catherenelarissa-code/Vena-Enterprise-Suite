@@ -18,6 +18,23 @@ async function agendaFetch(path: string) {
   return res.json();
 }
 
+async function financialFetch(path: string) {
+  const res = await fetch(`${API}/api/financial${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+type FinancialAccount = {
+  id: number; type: "payable" | "receivable"; description: string;
+  amount: number; dueDate: string; status: "pending" | "paid" | "overdue" | "cancelled";
+  category?: string; clientName?: string; supplierName?: string; projectName?: string;
+};
+
+type MonthlySummary = { month: string; income: number; expenses: number; balance: number };
+
 type Task = {
   id: number; title: string; description?: string;
   priority: "baixa" | "media" | "alta" | "urgente";
@@ -113,6 +130,10 @@ export function Dashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoadingAgenda, setIsLoadingAgenda] = useState(true);
 
+  const [upcomingAccounts, setUpcomingAccounts] = useState<FinancialAccount[]>([]);
+  const [monthlySummary, setMonthlySummary] = useState<MonthlySummary[]>([]);
+  const [isLoadingFinancial, setIsLoadingFinancial] = useState(true);
+
   useEffect(() => {
     let active = true;
     setIsLoadingAgenda(true);
@@ -124,6 +145,23 @@ export function Dashboard() {
       })
       .catch((e) => console.error(e))
       .finally(() => { if (active) setIsLoadingAgenda(false); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setIsLoadingFinancial(true);
+    Promise.all([
+      financialFetch("/accounts?status=pending&due_in_days=7"),
+      financialFetch("/monthly-summary"),
+    ])
+      .then(([accounts, summary]) => {
+        if (!active) return;
+        setUpcomingAccounts(accounts);
+        setMonthlySummary(summary);
+      })
+      .catch((e) => console.error(e))
+      .finally(() => { if (active) setIsLoadingFinancial(false); });
     return () => { active = false; };
   }, []);
 
@@ -146,6 +184,15 @@ export function Dashboard() {
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthSummary = monthlySummary.find(m => m.month === currentMonthKey);
+  const monthPayable = currentMonthSummary?.expenses ?? 0;
+  const monthReceivable = currentMonthSummary?.income ?? 0;
+
+  const sortedUpcomingAccounts = [...upcomingAccounts].sort(
+    (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -375,6 +422,76 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Financeiro: comparativo do mês + próximos vencimentos */}
+      <Card className="border-white/5" style={{ background: "hsl(220,25%,10%)" }}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white text-base">
+            <DollarSign className="h-4.5 w-4.5 text-yellow-400" />
+            Financeiro — Resumo do Mês
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingFinancial ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Comparativo a pagar vs a receber */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg p-3 border border-red-500/20" style={{ background: "rgba(239,68,68,0.05)" }}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <ArrowDownRight className="h-3.5 w-3.5 text-red-400" />
+                    <span className="text-xs text-white/50">A Pagar (mês)</span>
+                  </div>
+                  <p className="text-lg font-bold text-red-400">{formatCurrency(monthPayable)}</p>
+                </div>
+                <div className="rounded-lg p-3 border border-green-500/20" style={{ background: "rgba(34,197,94,0.05)" }}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <TrendingUp className="h-3.5 w-3.5 text-green-400" />
+                    <span className="text-xs text-white/50">A Receber (mês)</span>
+                  </div>
+                  <p className="text-lg font-bold text-green-400">{formatCurrency(monthReceivable)}</p>
+                </div>
+              </div>
+
+              {/* Próximos vencimentos */}
+              <div>
+                <p className="text-xs font-medium text-white/40 uppercase tracking-wider mb-2">Próximos Vencimentos (7 dias)</p>
+                {sortedUpcomingAccounts.length > 0 ? (
+                  <div className="space-y-2">
+                    {sortedUpcomingAccounts.slice(0, 6).map(acc => (
+                      <div key={acc.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-white/5" style={{ background: "hsl(220,25%,13%)" }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${acc.type === 'payable' ? 'bg-red-400' : 'bg-green-400'}`} />
+                          <div className="min-w-0">
+                            <p className="text-sm text-white truncate">{acc.description}</p>
+                            <p className="text-[11px] text-white/40">
+                              {new Date(acc.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                              {acc.supplierName ? ` · ${acc.supplierName}` : acc.clientName ? ` · ${acc.clientName}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`text-sm font-medium shrink-0 ${acc.type === 'payable' ? 'text-red-400' : 'text-green-400'}`}>
+                          {formatCurrency(acc.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-white/30">
+                    <CheckCircle2 className="h-7 w-7 mb-2 opacity-40" />
+                    <p className="text-xs">Nenhum vencimento nos próximos 7 dias</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Fluxo de caixa + Alertas */}
       <div className="grid gap-4 lg:grid-cols-7">
