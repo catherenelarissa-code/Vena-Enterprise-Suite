@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useGetDashboardSummary, getGetDashboardSummaryQueryKey, useGetDashboardCashFlow, getGetDashboardCashFlowQueryKey, useGetDashboardProjectsOverview, getGetDashboardProjectsOverviewQueryKey, useGetDashboardAlerts, getGetDashboardAlertsQueryKey } from "@workspace/api-client-react";
+import { useGetDashboardSummary, getGetDashboardSummaryQueryKey, useGetDashboardProjectsOverview, getGetDashboardProjectsOverviewQueryKey, useGetDashboardAlerts, getGetDashboardAlertsQueryKey, useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
 import { DollarSign, AlertTriangle, Briefcase, PackageOpen, ArrowDownRight, TrendingUp, TrendingDown, CheckCircle2, Zap, Bell, Calendar, Clock, ListTodo, CalendarClock, AlarmClock, Plus, Users2, CalendarPlus } from "lucide-react";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
@@ -124,6 +124,23 @@ function isUpcomingDeadline(dateStr?: string) {
   return due.getTime() >= startOfToday.getTime() && due.getTime() < in3Days.getTime();
 }
 
+const MOTIVATIONAL_PHRASES = [
+  "Hoje é um ótimo dia para construir algo grande.",
+  "Cada obra entregue é uma reputação conquistada.",
+  "Planejamento de hoje, resultado de amanhã.",
+  "Precisão no orçamento, solidez na entrega.",
+  "Boas decisões começam com bons dados — e você já tem eles aqui.",
+  "Engenharia é resolver problemas antes que eles apareçam.",
+  "Cada detalhe importa: do orçamento à última parede.",
+  "Vamos manter os prazos e elevar a qualidade.",
+  "O controle de hoje evita o retrabalho de amanhã.",
+  "Liderança é antecipar o que pode dar errado.",
+];
+
+function getRandomMotivationalPhrase() {
+  return MOTIVATIONAL_PHRASES[Math.floor(Math.random() * MOTIVATIONAL_PHRASES.length)];
+}
+
 // Torre elétrica SVG
 function TowerIllustration() {
   return (
@@ -155,9 +172,11 @@ function TowerIllustration() {
 
 export function Dashboard() {
   const { data: summary, isLoading: isLoadingSummary } = useGetDashboardSummary({ query: { queryKey: getGetDashboardSummaryQueryKey() } });
-  const { data: cashFlow, isLoading: isLoadingCashFlow } = useGetDashboardCashFlow({ query: { queryKey: getGetDashboardCashFlowQueryKey() } });
   const { data: projects, isLoading: isLoadingProjects } = useGetDashboardProjectsOverview({ query: { queryKey: getGetDashboardProjectsOverviewQueryKey() } });
   const { data: alerts, isLoading: isLoadingAlerts } = useGetDashboardAlerts({ query: { queryKey: getGetDashboardAlertsQueryKey() } });
+  const { data: user } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
+
+  const [motivationalPhrase] = useState(getRandomMotivationalPhrase);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -302,8 +321,9 @@ export function Dashboard() {
               <Zap className="h-5 w-5 text-orange-400" />
               <span className="text-orange-400 text-sm font-medium">Vena Engenharia</span>
             </div>
-            <h2 className="text-2xl font-bold text-white">Olá, Administrador! 👋</h2>
-            <p className="text-white/50 text-sm mt-1 capitalize">{dateStr}</p>
+            <h2 className="text-2xl font-bold text-white">Olá, {user?.name?.split(" ")[0] || "Usuário"}! 👋</h2>
+            <p className="text-orange-300/80 text-sm mt-1">{motivationalPhrase}</p>
+            <p className="text-white/40 text-xs mt-1 capitalize">{dateStr}</p>
           </div>
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-1.5 border border-white/10">
@@ -708,53 +728,9 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Fluxo de caixa + Alertas */}
-      <div className="grid gap-4 lg:grid-cols-7">
-        <Card className="lg:col-span-4 border-white/5" style={{background: "hsl(220,25%,10%)"}}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
-              <TrendingUp className="h-5 w-5 text-green-400"/>
-              Fluxo de Caixa
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingCashFlow ? (
-              <Skeleton className="h-[300px] w-full"/>
-            ) : cashFlow ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: "30 dias", value: cashFlow.days30 },
-                    { label: "60 dias", value: cashFlow.days60 },
-                    { label: "90 dias", value: cashFlow.days90 },
-                  ].map((item) => (
-                    <div key={item.label} className="rounded-lg p-3 text-center border border-white/5" style={{background: "hsl(220,25%,13%)"}}>
-                      <p className="text-xs text-white/40">{item.label}</p>
-                      <p className={`text-base font-bold mt-1 ${item.value >= 0 ? 'text-orange-400' : 'text-red-400'}`}>
-                        {formatCurrency(item.value)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={cashFlow.monthly} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)"/>
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)' }} tickFormatter={(v) => v.substring(0, 3)}/>
-                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)' }} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`}/>
-                    <RechartsTooltip formatter={(v: any) => formatCurrency(v)} cursor={{ fill: "rgba(255,255,255,0.03)" }} contentStyle={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'hsl(220,25%,13%)' }}/>
-                    <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}/>
-                    <Bar dataKey="income" name="Receitas" fill="#F97316" radius={[4,4,0,0]}/>
-                    <Bar dataKey="expenses" name="Despesas" fill="#22c55e" radius={[4,4,0,0]}/>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-white/30">Sem dados disponíveis</div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-3 border-white/5" style={{background: "hsl(220,25%,10%)"}}>
+      {/* Alertas */}
+      <div className="grid gap-4">
+        <Card className="border-white/5" style={{background: "hsl(220,25%,10%)"}}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <AlertTriangle className="h-5 w-5 text-orange-400"/>
