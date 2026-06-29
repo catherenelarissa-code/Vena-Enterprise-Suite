@@ -3,7 +3,7 @@ import { useGetDashboardSummary, getGetDashboardSummaryQueryKey, useGetDashboard
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
 import { DollarSign, AlertTriangle, Briefcase, PackageOpen, ArrowDownRight, TrendingUp, TrendingDown, CheckCircle2, Zap, Bell, Calendar, Clock, ListTodo, CalendarClock, AlarmClock } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
@@ -27,6 +27,15 @@ async function financialFetch(path: string) {
   return res.json();
 }
 
+async function suppliersFetch(path: string) {
+  const res = await fetch(`${API}/api/suppliers${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 type FinancialAccount = {
   id: number; type: "payable" | "receivable"; description: string;
   amount: number; dueDate: string; status: "pending" | "paid" | "overdue" | "cancelled";
@@ -34,6 +43,8 @@ type FinancialAccount = {
 };
 
 type MonthlySummary = { month: string; income: number; expenses: number; balance: number };
+
+type MonthlyDiscount = { month: string; savedAmount: number };
 
 type Task = {
   id: number; title: string; description?: string;
@@ -134,6 +145,9 @@ export function Dashboard() {
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary[]>([]);
   const [isLoadingFinancial, setIsLoadingFinancial] = useState(true);
 
+  const [monthlyDiscounts, setMonthlyDiscounts] = useState<MonthlyDiscount[]>([]);
+  const [isLoadingDiscounts, setIsLoadingDiscounts] = useState(true);
+
   useEffect(() => {
     let active = true;
     setIsLoadingAgenda(true);
@@ -165,6 +179,16 @@ export function Dashboard() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    setIsLoadingDiscounts(true);
+    suppliersFetch("/monthly-discounts")
+      .then((data) => { if (active) setMonthlyDiscounts(data); })
+      .catch((e) => console.error(e))
+      .finally(() => { if (active) setIsLoadingDiscounts(false); });
+    return () => { active = false; };
+  }, []);
+
   const pendingTasks = tasks.filter(t => t.status !== "concluida" && t.status !== "cancelada");
 
   const importantTasks = pendingTasks
@@ -193,6 +217,14 @@ export function Dashboard() {
   const sortedUpcomingAccounts = [...upcomingAccounts].sort(
     (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
   );
+
+  const discountChartData = monthlyDiscounts.map(d => {
+    const [year, month] = d.month.split('-');
+    const label = new Date(parseInt(year), parseInt(month) - 1, 1)
+      .toLocaleDateString('pt-BR', { month: 'short' });
+    return { month: label, savedAmount: d.savedAmount };
+  });
+  const totalSaved = monthlyDiscounts.reduce((sum, d) => sum + d.savedAmount, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -488,6 +520,41 @@ export function Dashboard() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Descontos conseguidos com fornecedores */}
+      <Card className="border-white/5" style={{ background: "hsl(220,25%,10%)" }}>
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="flex items-center gap-2 text-white text-base">
+              <TrendingDown className="h-4.5 w-4.5 text-green-400" />
+              Descontos com Fornecedores
+            </CardTitle>
+            {!isLoadingDiscounts && totalSaved > 0 && (
+              <span className="text-sm font-bold text-green-400">{formatCurrency(totalSaved)} economizados</span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingDiscounts ? (
+            <Skeleton className="h-[220px] w-full" />
+          ) : discountChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={discountChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)' }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)' }} tickFormatter={(v) => `R$${(v / 1000).toFixed(1)}k`} />
+                <RechartsTooltip formatter={(v: any) => formatCurrency(v)} cursor={{ stroke: "rgba(255,255,255,0.1)" }} contentStyle={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'hsl(220,25%,13%)' }} />
+                <Line type="monotone" dataKey="savedAmount" name="Economizado" stroke="#22c55e" strokeWidth={2.5} dot={{ fill: "#22c55e", r: 4 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[220px] flex flex-col items-center justify-center text-white/30">
+              <TrendingDown className="h-10 w-10 mb-2 opacity-30" />
+              <p className="text-sm">Nenhuma cotação aprovada com desconto ainda.</p>
             </div>
           )}
         </CardContent>
