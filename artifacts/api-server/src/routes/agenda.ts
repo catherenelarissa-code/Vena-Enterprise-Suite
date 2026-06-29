@@ -13,6 +13,33 @@ function param(value: any) {
 
 // ── Tarefas ──────────────────────────────────────────────
 router.get("/tasks", async (req, res) => {
+  const { assigned_to } = req.query as { assigned_to?: string };
+
+  if (assigned_to) {
+    const result = await db.execute(sql`
+      SELECT t.*, 
+        u1.name as assigned_name,
+        u2.name as created_name,
+        c.name as client_name,
+        p.name as project_name
+      FROM tasks t
+      LEFT JOIN users u1 ON t.assigned_to = u1.id
+      LEFT JOIN users u2 ON t.created_by = u2.id
+      LEFT JOIN clients c ON t.client_id = c.id
+      LEFT JOIN projects p ON t.project_id = p.id
+      WHERE t.assigned_to = ${parseInt(assigned_to)}
+      ORDER BY 
+        CASE t.priority 
+          WHEN 'urgente' THEN 1 
+          WHEN 'alta' THEN 2 
+          WHEN 'media' THEN 3 
+          WHEN 'baixa' THEN 4 
+        END,
+        t.due_date ASC NULLS LAST
+    `);
+    return res.json(result.rows);
+  }
+
   const result = await db.execute(sql`
     SELECT t.*, 
       u1.name as assigned_name,
@@ -81,13 +108,35 @@ router.delete("/tasks/:id", async (req, res) => {
 
 // ── Compromissos ─────────────────────────────────────────
 router.get("/appointments", async (req, res) => {
+  const { assigned_to } = req.query as { assigned_to?: string };
+
+  if (assigned_to) {
+    const result = await db.execute(sql`
+      SELECT a.*,
+        u1.name as assigned_name,
+        u2.name as created_name,
+        c.name as client_name,
+        p.name as project_name
+      FROM appointments a
+      LEFT JOIN users u1 ON a.assigned_to = u1.id
+      LEFT JOIN users u2 ON a.created_by = u2.id
+      LEFT JOIN clients c ON a.client_id = c.id
+      LEFT JOIN projects p ON a.project_id = p.id
+      WHERE a.assigned_to = ${parseInt(assigned_to)}
+      ORDER BY a.start_time ASC
+    `);
+    return res.json(result.rows);
+  }
+
   const result = await db.execute(sql`
     SELECT a.*,
-      u.name as created_name,
+      u1.name as assigned_name,
+      u2.name as created_name,
       c.name as client_name,
       p.name as project_name
     FROM appointments a
-    LEFT JOIN users u ON a.created_by = u.id
+    LEFT JOIN users u1 ON a.assigned_to = u1.id
+    LEFT JOIN users u2 ON a.created_by = u2.id
     LEFT JOIN clients c ON a.client_id = c.id
     LEFT JOIN projects p ON a.project_id = p.id
     ORDER BY a.start_time ASC
@@ -96,10 +145,10 @@ router.get("/appointments", async (req, res) => {
 });
 
 router.post("/appointments", async (req, res) => {
-  const { title, description, start_time, end_time, priority, type, client_id, project_id } = req.body;
+  const { title, description, start_time, end_time, priority, type, assigned_to, client_id, project_id } = req.body;
   const userId = (req.session as any).userId;
   const result = await db.execute(sql`
-    INSERT INTO appointments (title, description, start_time, end_time, priority, type, client_id, project_id, created_by)
+    INSERT INTO appointments (title, description, start_time, end_time, priority, type, assigned_to, client_id, project_id, created_by)
     VALUES (
       ${title},
       ${param(description)},
@@ -107,6 +156,7 @@ router.post("/appointments", async (req, res) => {
       ${param(end_time)},
       ${priority || 'media'},
       ${type || 'reuniao'},
+      ${param(assigned_to)},
       ${param(client_id)},
       ${param(project_id)},
       ${userId}
@@ -118,7 +168,7 @@ router.post("/appointments", async (req, res) => {
 
 router.patch("/appointments/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { title, description, start_time, end_time, priority, type } = req.body;
+  const { title, description, start_time, end_time, priority, type, assigned_to } = req.body;
   const result = await db.execute(sql`
     UPDATE appointments SET
       title = COALESCE(${param(title)}::text, title),
@@ -126,7 +176,8 @@ router.patch("/appointments/:id", async (req, res) => {
       start_time = COALESCE(${param(start_time)}::timestamp, start_time),
       end_time = COALESCE(${param(end_time)}::timestamp, end_time),
       priority = COALESCE(${param(priority)}::text, priority),
-      type = COALESCE(${param(type)}::text, type)
+      type = COALESCE(${param(type)}::text, type),
+      assigned_to = COALESCE(${param(assigned_to)}::integer, assigned_to)
     WHERE id = ${id}
     RETURNING *
   `);
