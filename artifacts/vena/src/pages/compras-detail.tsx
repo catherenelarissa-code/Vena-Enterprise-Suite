@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
   ArrowLeft, FileText, Package, AlertCircle, Building2, User,
-  Clock, Sparkles, Plus, Upload, X, Tag, Percent, AlertTriangle, CheckCircle2,
+  Clock, Sparkles, Plus, Upload, X, Percent, AlertTriangle, CheckCircle2, Crown,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -47,12 +47,9 @@ async function compressAndEncode(file: File): Promise<{ base64: string; mediaTyp
   });
 }
 
-// ── OCR Upload para cotação ───────────────────────────────────────────────────
+// ── OCR Upload ────────────────────────────────────────────────────────────────
 
-function OcrQuoteUpload({ itemNames, onExtracted }: {
-  itemNames: string[];
-  onExtracted: (data: any) => void;
-}) {
+function OcrQuoteUpload({ itemNames, onExtracted }: { itemNames: string[]; onExtracted: (data: any) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -63,7 +60,7 @@ function OcrQuoteUpload({ itemNames, onExtracted }: {
     setIsLoading(true);
     try {
       const { base64, mediaType } = await compressAndEncode(file);
-      const res = await fetch("https://workspaceapi-server-production-783e.up.railway.app/api/automation/ocr-quote", {
+      const res = await fetch("/api/automation/ocr-quote", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64, mediaType, itemNames }),
@@ -143,6 +140,111 @@ function StockBadge({ materialName, materials }: { materialName: string; materia
   );
 }
 
+// ── Tabela Comparativa de Preços por Item ─────────────────────────────────────
+
+function ItemPriceComparison({ quotes }: { quotes: any[] }) {
+  if (!quotes || quotes.length < 2) return null;
+
+  // Coleta todos os materiais únicos
+  const allMaterials = [...new Set(quotes.flatMap(q => q.items.map((i: any) => i.materialName)))];
+
+  // Para cada material, encontra o menor preço entre fornecedores
+  const minPrices: Record<string, number> = {};
+  for (const mat of allMaterials) {
+    const prices = quotes.flatMap(q => q.items.filter((i: any) => i.materialName === mat).map((i: any) => i.unitPrice));
+    if (prices.length > 0) minPrices[mat] = Math.min(...prices);
+  }
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center gap-2 mb-3">
+        <Crown className="h-4 w-4 text-amber-500" />
+        <h3 className="font-semibold text-sm">Comparação de Preço Unitário por Item</h3>
+        <span className="text-xs text-muted-foreground">(coroa = menor preço)</span>
+      </div>
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted/50">
+              <th className="text-left p-3 font-medium text-muted-foreground w-48">Material</th>
+              <th className="text-right p-3 font-medium text-muted-foreground w-20">Qtd</th>
+              {quotes.map(q => (
+                <th key={q.id} className="text-right p-3 font-medium min-w-[120px]">
+                  <div className="text-foreground">{q.supplierName}</div>
+                  <div className="text-xs text-muted-foreground font-normal">{q.deliveryDays}d • {q.freightCost ? formatCurrency(q.freightCost) : 'Frete grátis'}</div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {allMaterials.map((mat) => (
+              <tr key={mat} className="hover:bg-muted/20 transition-colors">
+                <td className="p-3 font-medium flex items-center gap-2">
+                  <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="truncate max-w-[160px]" title={mat}>{mat}</span>
+                </td>
+                <td className="p-3 text-right text-muted-foreground text-xs">
+                  {quotes[0]?.items.find((i: any) => i.materialName === mat)?.quantity ?? '-'}{' '}
+                  {quotes[0]?.items.find((i: any) => i.materialName === mat)?.unit ?? ''}
+                </td>
+                {quotes.map(q => {
+                  const item = q.items.find((i: any) => i.materialName === mat);
+                  const price = item?.unitPrice;
+                  const isMin = price !== undefined && price === minPrices[mat];
+                  const diff = price !== undefined && minPrices[mat] > 0
+                    ? Math.round(((price - minPrices[mat]) / minPrices[mat]) * 100)
+                    : null;
+
+                  return (
+                    <td key={q.id} className={`p-3 text-right ${isMin ? 'bg-secondary/5' : ''}`}>
+                      {price !== undefined ? (
+                        <div>
+                          <div className={`font-medium flex items-center justify-end gap-1 ${isMin ? 'text-secondary' : ''}`}>
+                            {isMin && <Crown className="h-3 w-3 text-amber-500" />}
+                            {formatCurrency(price)}
+                          </div>
+                          {diff !== null && diff > 0 && (
+                            <div className="text-xs text-destructive">+{diff}%</div>
+                          )}
+                          {isMin && (
+                            <div className="text-xs text-secondary">melhor</div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            {/* Linha de total */}
+            <tr className="bg-muted/30 font-semibold">
+              <td className="p-3" colSpan={2}>Total geral</td>
+              {quotes.map(q => {
+                const isMin = q.id === quotes.reduce((best: any, cur: any) =>
+                  cur.totalAmount < best.totalAmount ? cur : best
+                ).id;
+                return (
+                  <td key={q.id} className={`p-3 text-right ${isMin ? 'text-secondary' : ''}`}>
+                    <div className="flex items-center justify-end gap-1">
+                      {isMin && <Crown className="h-3 w-3 text-amber-500" />}
+                      {formatCurrency(q.totalAmount)}
+                    </div>
+                    {q.discount > 0 && (
+                      <div className="text-xs text-green-600 font-normal">-{q.discount}% desc.</div>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Página Principal ──────────────────────────────────────────────────────────
 
 export function ComprasDetail() {
@@ -162,12 +264,14 @@ export function ComprasDetail() {
   const { data: quotes, isLoading: isLoadingQuotes } = useCompareQuotes({ request_id: id }, { query: { enabled: !!id, queryKey: getCompareQuotesQueryKey({ request_id: id }) } });
   const { data: suppliers } = useListSuppliers({}, {});
   const [materials, setMaterials] = useState<any[]>([]);
+
   useEffect(() => {
     fetch("/api/materials", { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
       .then(setMaterials)
       .catch(() => {});
   }, []);
+
   const { mutate: createQuote, isPending: isCreatingQuote } = useCreateQuote();
   const { mutate: approveQuote, isPending: isApprovingQuote } = useApproveQuote();
 
@@ -198,7 +302,6 @@ export function ComprasDetail() {
     if (data.notes) setQuoteNotes((prev) => prev ? `${prev}\n${data.notes}` : data.notes);
   }
 
-  // Calcula total com desconto para exibição no modal
   const subtotal = quoteItems.reduce((sum, i) => sum + (parseFloat(i.unitPrice || "0") * parseFloat(i.quantity || "0")), 0);
   const discountValue = subtotal * (parseFloat(discount || "0") / 100);
   const total = subtotal - discountValue + parseFloat(freightCost || "0");
@@ -226,6 +329,7 @@ export function ComprasDetail() {
         queryClient.invalidateQueries({ queryKey: getGetPurchaseRequestQueryKey(id) });
         setShowQuoteModal(false);
         setSupplierId(""); setDeliveryDays(""); setFreightCost(""); setQuoteNotes(""); setDiscount("");
+        toast.success("Cotação adicionada!");
       }
     });
   }
@@ -235,6 +339,7 @@ export function ComprasDetail() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetPurchaseRequestQueryKey(id) });
         queryClient.invalidateQueries({ queryKey: getCompareQuotesQueryKey({ request_id: id }) });
+        toast.success("Cotação aprovada!");
       }
     });
   }
@@ -287,7 +392,7 @@ export function ComprasDetail() {
                     <div className="col-span-2 text-right">{item.quantity}</div>
                     <div className="col-span-2">{item.unit}</div>
                     <div className="col-span-3">
-                      {materials && <StockBadge materialName={item.materialName} materials={materials as any[]} />}
+                      {materials && <StockBadge materialName={item.materialName} materials={materials} />}
                     </div>
                   </div>
                 ))}
@@ -343,12 +448,11 @@ export function ComprasDetail() {
                   <p><strong>Recomendação:</strong> {quotes.aiInsight}</p>
                 </div>
               )}
+
+              {/* Cards por fornecedor */}
               <div className="grid gap-4 md:grid-cols-3">
                 {quotes.quotes.map((quote: any) => {
                   const isRecommended = quote.id === quotes.recommendedQuoteId;
-                  const discountPct = quote.discount ? parseFloat(quote.discount) : 0;
-                  const discountAmt = quote.totalAmount * (discountPct / 100);
-                  const finalAmount = quote.totalAmount - discountAmt;
                   return (
                     <Card key={quote.id} className={`relative overflow-hidden ${isRecommended ? 'border-accent shadow-sm' : ''}`}>
                       {isRecommended && (
@@ -358,14 +462,11 @@ export function ComprasDetail() {
                         <CardTitle className="text-base">{quote.supplierName}</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold mb-1">{formatCurrency(finalAmount)}</div>
-                        {discountPct > 0 && (
-                          <div className="flex items-center gap-1.5 mb-3">
-                            <span className="text-xs text-muted-foreground line-through">{formatCurrency(quote.totalAmount)}</span>
-                            <Badge className="text-xs bg-green-100 text-green-700 border-green-200">
-                              -{discountPct}% desconto
-                            </Badge>
-                          </div>
+                        <div className="text-2xl font-bold mb-1">{formatCurrency(quote.totalAmount)}</div>
+                        {quote.discount > 0 && (
+                          <Badge className="text-xs bg-green-100 text-green-700 border-green-200 mb-3">
+                            -{quote.discount}% desconto
+                          </Badge>
                         )}
                         <div className="space-y-2 text-sm text-muted-foreground">
                           <div className="flex justify-between">
@@ -376,26 +477,23 @@ export function ComprasDetail() {
                             <span>Frete:</span>
                             <span className="font-medium text-foreground">{quote.freightCost ? formatCurrency(quote.freightCost) : 'Grátis'}</span>
                           </div>
-                          {discountPct > 0 && (
-                            <div className="flex justify-between text-green-600">
-                              <span>Desconto:</span>
-                              <span className="font-medium">-{formatCurrency(discountAmt)}</span>
-                            </div>
-                          )}
                         </div>
                         {quote.status !== 'approved' ? (
-                          <Button className="w-full mt-6" variant={isRecommended ? "default" : "outline"}
+                          <Button className="w-full mt-4" variant={isRecommended ? "default" : "outline"}
                             onClick={() => handleApproveQuote(quote.id)} disabled={isApprovingQuote}>
                             Aprovar esta Cotação
                           </Button>
                         ) : (
-                          <Badge className="w-full mt-6 justify-center py-2 bg-secondary/10 text-secondary border-secondary/20">✓ Aprovada</Badge>
+                          <Badge className="w-full mt-4 justify-center py-2 bg-secondary/10 text-secondary border-secondary/20">✓ Aprovada</Badge>
                         )}
                       </CardContent>
                     </Card>
                   );
                 })}
               </div>
+
+              {/* Tabela comparativa por item */}
+              <ItemPriceComparison quotes={quotes.quotes} />
             </div>
           ) : (
             <div className="text-center py-6 text-muted-foreground">
@@ -436,8 +534,6 @@ export function ComprasDetail() {
                 <Label>Frete (R$)</Label>
                 <Input type="number" placeholder="0,00" value={freightCost} onChange={e => setFreightCost(e.target.value)} />
               </div>
-
-              {/* Campo de desconto */}
               <div className="col-span-2 space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <Percent className="h-3.5 w-3.5" /> Desconto negociado (%)
@@ -455,7 +551,6 @@ export function ComprasDetail() {
                   )}
                 </div>
               </div>
-
               <div className="col-span-2 space-y-2">
                 <Label>Observações</Label>
                 <Textarea placeholder="Condições de pagamento, validade da cotação..." value={quoteNotes} onChange={e => setQuoteNotes(e.target.value)} />
