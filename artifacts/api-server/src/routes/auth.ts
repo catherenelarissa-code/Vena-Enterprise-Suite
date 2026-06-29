@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import * as crypto from "crypto";
 
 const router = Router();
@@ -166,6 +167,60 @@ router.post("/users/:id/approve", async (req, res) => {
   const id = parseInt(req.params.id);
   await db.update(usersTable).set({ status: "active" }).where(eq(usersTable.id, id));
   return res.json({ ok: true });
+});
+
+// PATCH /auth/users/:id/deactivate — inativa sem apagar o registro
+router.patch("/users/:id/deactivate", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.update(usersTable).set({ status: "inactive" }).where(eq(usersTable.id, id));
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Deactivate user error:", err);
+    return res.status(500).json({ error: "Erro ao inativar usuário" });
+  }
+});
+
+// DELETE /auth/users/:id — exclui de vez, bloqueando se houver vínculos
+router.delete("/users/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    // Verifica vínculos em tabelas que referenciam o usuário.
+    // Cada checagem é isolada em try/catch porque algumas tabelas podem
+    // não existir ainda em todos os ambientes — nesse caso, ignoramos
+    // essa checagem específica em vez de quebrar a exclusão inteira.
+    const checks: { label: string; query: any }[] = [
+      { label: "tarefas atribuídas", query: sql`SELECT COUNT(*) FROM tasks WHERE assigned_to = ${id} OR created_by = ${id}` },
+      { label: "compromissos atribuídos", query: sql`SELECT COUNT(*) FROM appointments WHERE assigned_to = ${id} OR created_by = ${id}` },
+      { label: "histórico de clientes", query: sql`SELECT COUNT(*) FROM client_history WHERE created_by = ${id}` },
+    ];
+
+    const blockers: string[] = [];
+    for (const check of checks) {
+      try {
+        const result = await db.execute(check.query);
+        const count = Number((result.rows[0] as any)?.count ?? 0);
+        if (count > 0) blockers.push(`${count} ${check.label}`);
+      } catch (e) {
+        // Tabela pode não existir nesse ambiente — ignora essa checagem específica
+        console.warn(`Checagem de vínculo ignorada (${check.label}):`, e);
+      }
+    }
+
+    if (blockers.length > 0) {
+      return res.status(409).json({
+        error: "Não é possível excluir: usuário possui registros vinculados",
+        details: blockers,
+      });
+    }
+
+    await db.delete(usersTable).where(eq(usersTable.id, id));
+    return res.status(204).send();
+  } catch (err) {
+    console.error("Delete user error:", err);
+    return res.status(500).json({ error: "Erro ao excluir usuário" });
+  }
 });
 
 export default router;
