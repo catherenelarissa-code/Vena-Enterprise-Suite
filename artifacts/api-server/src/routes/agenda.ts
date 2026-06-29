@@ -4,6 +4,13 @@ import { sql } from "drizzle-orm";
 
 const router = Router();
 
+// Helper: gera um parâmetro NULL com tipo explícito, evitando que o
+// driver "omita" o parâmetro dentro de COALESCE(...) quando o valor é
+// undefined/null (isso gerava "COALESCE(, coluna)" — SQL inválido).
+function param(value: any) {
+  return value === undefined || value === "" ? null : value;
+}
+
 // ── Tarefas ──────────────────────────────────────────────
 router.get("/tasks", async (req, res) => {
   const result = await db.execute(sql`
@@ -36,13 +43,13 @@ router.post("/tasks", async (req, res) => {
     INSERT INTO tasks (title, description, priority, due_date, start_date, assigned_to, client_id, project_id, created_by)
     VALUES (
       ${title},
-      ${description || null},
+      ${param(description)},
       ${priority || 'media'},
-      ${due_date || null},
-      ${start_date || null},
-      ${assigned_to || null},
-      ${client_id || null},
-      ${project_id || null},
+      ${param(due_date)},
+      ${param(start_date)},
+      ${param(assigned_to)},
+      ${param(client_id)},
+      ${param(project_id)},
       ${userId}
     )
     RETURNING *
@@ -55,12 +62,12 @@ router.patch("/tasks/:id", async (req, res) => {
   const { title, description, priority, status, due_date, assigned_to } = req.body;
   const result = await db.execute(sql`
     UPDATE tasks SET
-      title = COALESCE(${title || null}, title),
-      description = COALESCE(${description || null}, description),
-      priority = COALESCE(${priority || null}, priority),
-      status = COALESCE(${status || null}, status),
-      due_date = COALESCE(${due_date || null}, due_date),
-      assigned_to = COALESCE(${assigned_to || null}, assigned_to)
+      title = COALESCE(${param(title)}::text, title),
+      description = COALESCE(${param(description)}::text, description),
+      priority = COALESCE(${param(priority)}::text, priority),
+      status = COALESCE(${param(status)}::text, status),
+      due_date = COALESCE(${param(due_date)}::timestamp, due_date),
+      assigned_to = COALESCE(${param(assigned_to)}::integer, assigned_to)
     WHERE id = ${id}
     RETURNING *
   `);
@@ -95,13 +102,13 @@ router.post("/appointments", async (req, res) => {
     INSERT INTO appointments (title, description, start_time, end_time, priority, type, client_id, project_id, created_by)
     VALUES (
       ${title},
-      ${description || null},
-      ${start_time || null},
-      ${end_time || null},
+      ${param(description)},
+      ${start_time},
+      ${param(end_time)},
       ${priority || 'media'},
       ${type || 'reuniao'},
-      ${client_id || null},
-      ${project_id || null},
+      ${param(client_id)},
+      ${param(project_id)},
       ${userId}
     )
     RETURNING *
@@ -114,12 +121,12 @@ router.patch("/appointments/:id", async (req, res) => {
   const { title, description, start_time, end_time, priority, type } = req.body;
   const result = await db.execute(sql`
     UPDATE appointments SET
-      title = COALESCE(${title || null}, title),
-      description = COALESCE(${description || null}, description),
-      start_time = COALESCE(${start_time || null}, start_time),
-      end_time = COALESCE(${end_time || null}, end_time),
-      priority = COALESCE(${priority || null}, priority),
-      type = COALESCE(${type || null}, type)
+      title = COALESCE(${param(title)}::text, title),
+      description = COALESCE(${param(description)}::text, description),
+      start_time = COALESCE(${param(start_time)}::timestamp, start_time),
+      end_time = COALESCE(${param(end_time)}::timestamp, end_time),
+      priority = COALESCE(${param(priority)}::text, priority),
+      type = COALESCE(${param(type)}::text, type)
     WHERE id = ${id}
     RETURNING *
   `);
