@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import {
   useListFinancialAccounts, getListFinancialAccountsQueryKey,
-  useCreateFinancialAccount, useUpdateFinancialAccount, useDeleteFinancialAccount,
+  useCreateFinancialAccount, useUpdateFinancialAccount,
   useListSuppliers,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -376,7 +376,6 @@ export function Financeiro() {
   const { data: receivable, isLoading: isLoadingReceivable } = useListFinancialAccounts({ type: "receivable" }, { query: { queryKey: getListFinancialAccountsQueryKey({ type: "receivable" }) } });
   const { data: suppliers } = useListSuppliers({}, {});
   const { mutate: updateAccount } = useUpdateFinancialAccount();
-  const { mutate: deleteAccount } = useDeleteFinancialAccount();
 
   const totalPayable = payable?.filter((a: any) => a.status !== 'paid').reduce((s: number, a: any) => s + a.amount, 0) ?? 0;
   const totalReceivable = receivable?.filter((a: any) => a.status !== 'paid').reduce((s: number, a: any) => s + a.amount, 0) ?? 0;
@@ -405,11 +404,14 @@ export function Financeiro() {
     updateAccount({ id, data: { status: "paid", paidAt: new Date().toISOString() } }, { onSuccess: refreshAll });
   }
 
-  function handleDelete(id: number) {
-    deleteAccount({ id }, {
-      onSuccess: () => { toast.success("Conta excluída."); refreshAll(); },
-      onError: () => toast.error("Erro ao excluir."),
-    });
+  async function handleDelete(id: number) {
+    try {
+      await apiCall(`/accounts/${id}`, { method: "DELETE" });
+      toast.success("Conta excluída.");
+      refreshAll();
+    } catch {
+      toast.error("Erro ao excluir.");
+    }
   }
 
   function handleEdit(acc: Account) {
