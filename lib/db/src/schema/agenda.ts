@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { clientsTable } from "./crm";
-imt { projectsTable } from "./projects";
+import { projectsTable } from "./projects";
 
 export const tasksTable = pgTable("tasks", {
   id: serial("id").primaryKey(),
