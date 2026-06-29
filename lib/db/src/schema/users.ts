@@ -20,3 +20,10 @@ export const usersTable = pgTable("users", {
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof usersTable.$inferSelect;
+
+// Tabela de sessões - gerenciada pelo connect-pg-simple
+export const userSessionsTable = pgTable("user_sessions", {
+  sid: text("sid").primaryKey(),
+  sess: text("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
