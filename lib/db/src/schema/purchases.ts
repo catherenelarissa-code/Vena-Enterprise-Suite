@@ -66,15 +66,6 @@ export const purchaseOrdersTable = pgTable("purchase_orders", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// ✅ Tabela CRM — mantém os dados existentes no banco
-export const crmColumnsTable = pgTable("crm_columns", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  order: integer("order").notNull().default(0),
-  color: text("color"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 export const insertPurchaseRequestSchema = createInsertSchema(purchaseRequestsTable).omit({ id: true, createdAt: true });
 export const insertQuoteSchema = createInsertSchema(quotesTable).omit({ id: true, createdAt: true });
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrdersTable).omit({ id: true, createdAt: true });
@@ -84,4 +75,3 @@ export type PurchaseRequestItem = typeof purchaseRequestItemsTable.$inferSelect;
 export type Quote = typeof quotesTable.$inferSelect;
 export type QuoteItem = typeof quoteItemsTable.$inferSelect;
 export type PurchaseOrder = typeof purchaseOrdersTable.$inferSelect;
-export type CrmColumn = typeof crmColumnsTable.$inferSelect;
