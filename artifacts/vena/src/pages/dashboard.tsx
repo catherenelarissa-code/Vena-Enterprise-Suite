@@ -36,6 +36,15 @@ async function suppliersFetch(path: string) {
   return res.json();
 }
 
+async function priceMonitorFetch(path: string) {
+  const res = await fetch(`${API}/api/price-monitor${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 type FinancialAccount = {
   id: number; type: "payable" | "receivable"; description: string;
   amount: number; dueDate: string; status: "pending" | "paid" | "overdue" | "cancelled";
@@ -45,6 +54,18 @@ type FinancialAccount = {
 type MonthlySummary = { month: string; income: number; expenses: number; balance: number };
 
 type MonthlyDiscount = { month: string; savedAmount: number };
+
+type MonitoredProduct = {
+  id: number; name: string; category: string;
+  currentPrice: number; priceChangePercent: number;
+  lowestPrice30d: number; lowestPrice90d: number;
+};
+
+type PriceAlert = {
+  id: number; productId: number; productName: string;
+  type: "price_drop" | "lowest_in_30d" | "lowest_in_90d" | "stock_low";
+  message: string; percentChange: number; createdAt: string;
+};
 
 type Task = {
   id: number; title: string; description?: string;
@@ -148,6 +169,10 @@ export function Dashboard() {
   const [monthlyDiscounts, setMonthlyDiscounts] = useState<MonthlyDiscount[]>([]);
   const [isLoadingDiscounts, setIsLoadingDiscounts] = useState(true);
 
+  const [monitoredProducts, setMonitoredProducts] = useState<MonitoredProduct[]>([]);
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
+  const [isLoadingPriceMonitor, setIsLoadingPriceMonitor] = useState(true);
+
   useEffect(() => {
     let active = true;
     setIsLoadingAgenda(true);
@@ -189,6 +214,23 @@ export function Dashboard() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    setIsLoadingPriceMonitor(true);
+    Promise.all([
+      priceMonitorFetch("/products"),
+      priceMonitorFetch("/alerts"),
+    ])
+      .then(([products, alerts]) => {
+        if (!active) return;
+        setMonitoredProducts(products);
+        setPriceAlerts(alerts);
+      })
+      .catch((e) => console.error(e))
+      .finally(() => { if (active) setIsLoadingPriceMonitor(false); });
+    return () => { active = false; };
+  }, []);
+
   const pendingTasks = tasks.filter(t => t.status !== "concluida" && t.status !== "cancelada");
 
   const importantTasks = pendingTasks
@@ -225,6 +267,17 @@ export function Dashboard() {
     return { month: label, savedAmount: d.savedAmount };
   });
   const totalSaved = monthlyDiscounts.reduce((sum, d) => sum + d.savedAmount, 0);
+
+  const topPriceVariations = [...monitoredProducts]
+    .filter(p => p.priceChangePercent !== 0)
+    .sort((a, b) => Math.abs(b.priceChangePercent) - Math.abs(a.priceChangePercent))
+    .slice(0, 5);
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const recentTargetAlerts = priceAlerts
+    .filter(a => (a.type === "lowest_in_30d" || a.type === "lowest_in_90d") && new Date(a.createdAt) >= sevenDaysAgo)
+    .slice(0, 5);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -555,6 +608,77 @@ export function Dashboard() {
             <div className="h-[220px] flex flex-col items-center justify-center text-white/30">
               <TrendingDown className="h-10 w-10 mb-2 opacity-30" />
               <p className="text-sm">Nenhuma cotação aprovada com desconto ainda.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Monitor de Preços: variações + metas batidas */}
+      <Card className="border-white/5" style={{ background: "hsl(220,25%,10%)" }}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white text-base">
+            <TrendingDown className="h-4.5 w-4.5 text-red-400" />
+            Monitor de Preços
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingPriceMonitor ? (
+            <div className="space-y-3">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Maiores variações da semana */}
+              <div>
+                <p className="text-xs font-medium text-white/40 uppercase tracking-wider mb-2">Maiores Variações</p>
+                {topPriceVariations.length > 0 ? (
+                  <div className="space-y-2">
+                    {topPriceVariations.map(p => (
+                      <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-white/5" style={{ background: "hsl(220,25%,13%)" }}>
+                        <div className="min-w-0">
+                          <p className="text-sm text-white truncate">{p.name}</p>
+                          <p className="text-[11px] text-white/40">{formatCurrency(p.currentPrice)}</p>
+                        </div>
+                        <span className={`text-sm font-bold shrink-0 flex items-center gap-1 ${p.priceChangePercent < 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {p.priceChangePercent < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}
+                          {p.priceChangePercent > 0 ? '+' : ''}{p.priceChangePercent}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-white/30">
+                    <p className="text-xs">Sem variações recentes</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Metas de preço batidas */}
+              <div>
+                <p className="text-xs font-medium text-white/40 uppercase tracking-wider mb-2">Metas de Preço Batidas (7 dias)</p>
+                {recentTargetAlerts.length > 0 ? (
+                  <div className="space-y-2">
+                    {recentTargetAlerts.map(alert => (
+                      <div key={alert.id} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-green-500/20" style={{ background: "rgba(34,197,94,0.05)" }}>
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-400 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white truncate">{alert.productName}</p>
+                          <p className="text-[11px] text-green-400/80 mt-0.5">
+                            {alert.type === "lowest_in_30d" ? "Menor preço em 30 dias" : "Menor preço em 90 dias"}
+                            {" · "}{alert.percentChange}%
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-white/30">
+                    <p className="text-xs">Nenhuma meta batida nos últimos 7 dias</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
