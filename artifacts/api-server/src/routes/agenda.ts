@@ -34,7 +34,17 @@ router.post("/tasks", async (req, res) => {
   const userId = (req.session as any).userId;
   const result = await db.execute(sql`
     INSERT INTO tasks (title, description, priority, due_date, start_date, assigned_to, client_id, project_id, created_by)
-    VALUES (${title}, ${description}, ${priority ?? 'media'}, ${due_date ?? null}, ${start_date ?? null}, ${assigned_to ?? null}, ${client_id ?? null}, ${project_id ?? null}, ${userId})
+    VALUES (
+      ${title},
+      ${description || null},
+      ${priority || 'media'},
+      ${due_date || null},
+      ${start_date || null},
+      ${assigned_to || null},
+      ${client_id || null},
+      ${project_id || null},
+      ${userId}
+    )
     RETURNING *
   `);
   return res.status(201).json(result.rows[0]);
@@ -45,12 +55,12 @@ router.patch("/tasks/:id", async (req, res) => {
   const { title, description, priority, status, due_date, assigned_to } = req.body;
   const result = await db.execute(sql`
     UPDATE tasks SET
-      title = COALESCE(${title}, title),
-      description = COALESCE(${description}, description),
-      priority = COALESCE(${priority}, priority),
-      status = COALESCE(${status}, status),
-      due_date = COALESCE(${due_date ?? null}, due_date),
-      assigned_to = COALESCE(${assigned_to ?? null}, assigned_to)
+      title = COALESCE(${title || null}, title),
+      description = COALESCE(${description || null}, description),
+      priority = COALESCE(${priority || null}, priority),
+      status = COALESCE(${status || null}, status),
+      due_date = COALESCE(${due_date || null}, due_date),
+      assigned_to = COALESCE(${assigned_to || null}, assigned_to)
     WHERE id = ${id}
     RETURNING *
   `);
@@ -64,17 +74,6 @@ router.delete("/tasks/:id", async (req, res) => {
 
 // ── Compromissos ─────────────────────────────────────────
 router.get("/appointments", async (req, res) => {
-  const { month, year } = req.query;
-  let query = sql`
-    SELECT a.*,
-      u.name as created_name,
-      c.name as client_name,
-      p.name as project_name
-    FROM appointments a
-    LEFT JOIN users u ON a.created_by = u.id
-    LEFT JOIN clients c ON a.client_id = c.id
-    LEFT JOIN projects p ON a.project_id = p.id
-  `;
   const result = await db.execute(sql`
     SELECT a.*,
       u.name as created_name,
@@ -94,7 +93,17 @@ router.post("/appointments", async (req, res) => {
   const userId = (req.session as any).userId;
   const result = await db.execute(sql`
     INSERT INTO appointments (title, description, start_time, end_time, priority, type, client_id, project_id, created_by)
-    VALUES (${title}, ${description}, ${start_time}, ${end_time ?? null}, ${priority ?? 'media'}, ${type ?? 'reuniao'}, ${client_id ?? null}, ${project_id ?? null}, ${userId})
+    VALUES (
+      ${title},
+      ${description || null},
+      ${start_time || null},
+      ${end_time || null},
+      ${priority || 'media'},
+      ${type || 'reuniao'},
+      ${client_id || null},
+      ${project_id || null},
+      ${userId}
+    )
     RETURNING *
   `);
   return res.status(201).json(result.rows[0]);
@@ -105,12 +114,12 @@ router.patch("/appointments/:id", async (req, res) => {
   const { title, description, start_time, end_time, priority, type } = req.body;
   const result = await db.execute(sql`
     UPDATE appointments SET
-      title = COALESCE(${title}, title),
-      description = COALESCE(${description}, description),
-      start_time = COALESCE(${start_time ?? null}, start_time),
-      end_time = COALESCE(${end_time ?? null}, end_time),
-      priority = COALESCE(${priority}, priority),
-      type = COALESCE(${type}, type)
+      title = COALESCE(${title || null}, title),
+      description = COALESCE(${description || null}, description),
+      start_time = COALESCE(${start_time || null}, start_time),
+      end_time = COALESCE(${end_time || null}, end_time),
+      priority = COALESCE(${priority || null}, priority),
+      type = COALESCE(${type || null}, type)
     WHERE id = ${id}
     RETURNING *
   `);
