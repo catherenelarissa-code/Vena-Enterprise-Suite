@@ -472,15 +472,7 @@ export function Automacao() {
         <>
       {/* Filtro por etiqueta */}
           
-          {templates.length > 0 && (
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs text-muted-foreground flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Filtrar:</span>
-          <button
-            type="button"
-            onClick={() => setFilterLabel("")}
-            className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
-              filterLabel === "" ? "bg-foreground text-background border-foreground" : "bg-background text-muted-foreground border-border hover:border-primary/40"
-            }`}
+         
           >
             Todos
           </button>
