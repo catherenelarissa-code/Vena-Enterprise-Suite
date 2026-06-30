@@ -1,3 +1,6 @@
+import stockMovementsRouter from "./stock-movements";
+// ...
+router.use("/stock-movements", stockMovementsRouter);
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
