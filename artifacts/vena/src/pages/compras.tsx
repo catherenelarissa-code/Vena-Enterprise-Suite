@@ -69,73 +69,229 @@ type Item = { materialName: string; quantity: string; unit: string; notes: strin
 
 // ── OCR Upload ────────────────────────────────────────────────────────────────
 
-function OcrMaterialsUpload({ onExtracted }: { onExtracted: (items: Item[]) => void }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+import * as pdfjsLib from "pdfjs-dist";
 
-  async function handleFile(file: File) {
-    if (!file.type.startsWith("image/")) { toast.error("Envie uma imagem (JPG, PNG, etc)."); return; }
-    setPreview(URL.createObjectURL(file));
-    setIsLoading(true);
+async function convertPdfToImage(file: File) {
+  const data = await file.arrayBuffer();
+
+  const pdf =
+    await pdfjsLib
+      .getDocument({
+        data,
+      })
+      .promise;
+
+  const page =
+    await pdf.getPage(1);
+
+  const viewport =
+    page.getViewport({
+      scale: 2,
+    });
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+  const ctx =
+    canvas.getContext(
+      "2d"
+    )!;
+
+  canvas.width =
+    viewport.width;
+
+  canvas.height =
+    viewport.height;
+
+  await page.render({
+    canvasContext:
+      ctx,
+    viewport,
+  }).promise;
+
+  return {
+    base64:
+      canvas
+        .toDataURL(
+          "image/jpeg",
+          0.85
+        )
+        .split(",")[1],
+
+    mediaType:
+      "image/jpeg",
+  };
+}
+
+function OcrMaterialsUpload({
+  onExtracted,
+}: {
+  onExtracted: (
+    items: Item[]
+  ) => void;
+}) {
+  const fileRef =
+    useRef<HTMLInputElement>(
+      null
+    );
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(false);
+
+  async function handleFile(
+    file: File
+  ) {
+    const isImage =
+      file.type.startsWith(
+        "image/"
+      );
+
+    const isPdf =
+      file.type ===
+      "application/pdf";
+
+    if (
+      !isImage &&
+      !isPdf
+    ) {
+      toast.error(
+        "Envie imagem ou PDF."
+      );
+
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const { base64, mediaType } = await compressAndEncode(file);
-      const res = await fetch("https://workspaceapi-server-production-783e.up.railway.app/api/automation/ocr-materials", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, mediaType }),
-      });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? "Erro ao processar"); }
-      const data = await res.json();
-      if (!data.items?.length) { toast.error("Nenhum material encontrado na imagem."); return; }
-      onExtracted(data.items);
-      toast.success(`${data.items.length} itens extraídos!`);
-    } catch (err: any) {
-      toast.error(err.message ?? "Erro ao ler materiais.");
+      const payload =
+        isPdf
+          ? await convertPdfToImage(
+              file
+            )
+          : await compressAndEncode(
+              file
+            );
+
+      const res =
+        await fetch(
+          "/api/automation/ocr-materials",
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify(
+                payload
+              ),
+          }
+        );
+
+      if (!res.ok) {
+        throw new Error(
+          "Erro OCR"
+        );
+      }
+
+      const data =
+        await res.json();
+
+      onExtracted(
+        data.items ??
+          []
+      );
+
+      toast.success(
+        "Documento lido!"
+      );
+    } catch {
+      toast.error(
+        "Erro ao processar documento"
+      );
     } finally {
-      setIsLoading(false);
+      setLoading(
+        false
+      );
     }
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label className="flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5 text-primary" /> Ler materiais por imagem (IA)
-        </Label>
-        {preview && !isLoading && (
-          <button type="button" onClick={() => setPreview(null)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-            <X className="h-3 w-3" /> Remover
-          </button>
-        )}
-      </div>
+    <div className="space-y-3">
+
+      <Label>
+        Importar itens
+      </Label>
+
       <div
-        className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
-        onClick={() => !isLoading && fileRef.current?.click()}
-        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
-        onDragOver={(e) => e.preventDefault()}
+        className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary"
+
+        onClick={() =>
+          fileRef.current?.click()
+        }
       >
-        <input ref={fileRef} type="file" accept="image/*" className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
-        {isLoading ? (
-          <div className="flex flex-col items-center gap-2 py-3">
-            <Sparkles className="h-6 w-6 text-primary animate-pulse" />
-            <p className="text-sm font-medium">Lendo materiais com IA...</p>
-            <p className="text-xs text-muted-foreground">Identificando itens, quantidades e unidades...</p>
-          </div>
-        ) : preview ? (
-          <div className="space-y-1">
-            <img src={preview} alt="Documento" className="max-h-28 mx-auto rounded object-contain" />
-            <p className="text-xs text-muted-foreground">Clique para trocar a imagem</p>
+
+        <input
+          ref={
+            fileRef
+          }
+
+          type="file"
+
+          accept="image/*,application/pdf"
+
+          capture="environment"
+
+          className="hidden"
+
+          onChange={(
+            e
+          ) => {
+            const file =
+              e.target
+                .files?.[0];
+
+            if (
+              file
+            ) {
+              handleFile(
+                file
+              );
+            }
+          }}
+        />
+
+        {loading ? (
+          <div>
+            Processando...
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2 py-3">
-            <Upload className="h-6 w-6 text-muted-foreground" />
-            <p className="text-sm font-medium">Fotografe o orçamento ou lista de materiais</p>
-            <p className="text-xs text-muted-foreground">A IA extrai os itens automaticamente • Arraste ou clique</p>
-          </div>
+          <>
+            <Upload className="mx-auto mb-2 h-6 w-6" />
+
+            <p>
+              Tirar foto
+              ou enviar
+              PDF
+            </p>
+
+          </>
         )}
+
       </div>
+
     </div>
   );
 }
