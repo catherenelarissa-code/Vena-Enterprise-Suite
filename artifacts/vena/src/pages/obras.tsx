@@ -441,8 +441,8 @@ export function Obras() {
     const matchSearch = !search ||
       (p.costCenter ?? p.name).toLowerCase().includes(search.toLowerCase()) ||
       p.client.toLowerCase().includes(search.toLowerCase());
-    const matchType = !filterType || p.type === filterType;
-    const matchStatus = !filterStatus || p.status === filterStatus;
+    const matchType = !filterType || filterType === "all" || p.type === filterType;
+    const matchStatus = !filterStatus || filterStatus === "all" || p.status === filterStatus;
     return matchSearch && matchType && matchStatus;
   });
 
@@ -527,7 +527,7 @@ export function Obras() {
             <SelectValue placeholder="Tipo de obra" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos os tipos</SelectItem>
+            <SelectItem value="all">Todos os tipos</SelectItem>
             {PROJECT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -536,7 +536,7 @@ export function Obras() {
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos os status</SelectItem>
+            <SelectItem value="all">Todos os status</SelectItem>
             {PROJECT_STATUS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
