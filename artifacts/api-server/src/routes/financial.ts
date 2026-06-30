@@ -5,6 +5,9 @@ import {
   financialCategoriesTable,
   projectsTable,
   suppliersTable,
+  clientsTable,
+  clientHistoryTable,
+  purchaseOrdersTable,
 } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 
@@ -19,6 +22,8 @@ const DEFAULT_INCOME_CATEGORIES = ["Receita de obra","Adiantamento de cliente","
 async function enrichAccount(a: any) {
   let projectName = null;
   let supplierName = null;
+  let clientNameResolved = a.clientName ?? null;
+
   if (a.projectId) {
     const [p] = await db.select().from(projectsTable).where(eq(projectsTable.id, a.projectId)).limit(1);
     projectName = p?.name ?? null;
@@ -27,6 +32,11 @@ async function enrichAccount(a: any) {
     const [s] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, a.supplierId)).limit(1);
     supplierName = s?.name ?? null;
   }
+  if (a.clientId) {
+    const [c] = await db.select().from(clientsTable).where(eq(clientsTable.id, a.clientId)).limit(1);
+    clientNameResolved = c?.name ?? clientNameResolved;
+  }
+
   return {
     id: a.id,
     type: a.type,
@@ -39,8 +49,11 @@ async function enrichAccount(a: any) {
     projectName,
     supplierId: a.supplierId,
     supplierName,
+    clientId: a.clientId ?? null,
+    clientName: clientNameResolved,
+    purchaseOrderId: a.purchaseOrderId ?? null,
+    paymentMethod: a.paymentMethod ?? null,
     category: a.category,
-    clientName: a.clientName,
     attachmentUrl: a.attachmentUrl,
     notes: a.notes,
     createdAt: a.createdAt.toISOString(),
@@ -62,6 +75,7 @@ router.get("/accounts", async (req, res) => {
     }
     return res.json(await Promise.all(accounts.map(enrichAccount)));
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: "Erro ao listar contas" });
   }
 });
@@ -69,11 +83,13 @@ router.get("/accounts", async (req, res) => {
 // POST /accounts
 router.post("/accounts", async (req, res) => {
   try {
-    const { type, description, amount, dueDate, projectId, supplierId, category, clientName, attachmentUrl, notes } = req.body;
+    const { type, description, amount, dueDate, projectId, supplierId, clientId, paymentMethod, category, clientName, attachmentUrl, notes } = req.body;
     const [account] = await db.insert(financialAccountsTable).values({
       type, description,
       amount: amount.toString(),
       dueDate, projectId, supplierId, category,
+      clientId: clientId || null,
+      paymentMethod: paymentMethod || null,
       clientName: clientName || null,
       attachmentUrl: attachmentUrl || null,
       notes: notes || null,
@@ -90,7 +106,7 @@ router.patch("/accounts/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const updates: any = {};
-    const fields = ["description", "category", "clientName", "attachmentUrl", "notes", "dueDate", "supplierId", "projectId"];
+    const fields = ["description", "category", "clientName", "attachmentUrl", "notes", "dueDate", "supplierId", "projectId", "clientId", "paymentMethod"];
     for (const f of fields) if (req.body[f] !== undefined) updates[f] = req.body[f] || null;
     if (req.body.status) updates.status = req.body.status;
     if (req.body.paidAt) updates.paidAt = new Date(req.body.paidAt);
@@ -99,7 +115,49 @@ router.patch("/accounts/:id", async (req, res) => {
     const [account] = await db.select().from(financialAccountsTable).where(eq(financialAccountsTable.id, id)).limit(1);
     return res.json(await enrichAccount(account));
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: "Erro ao atualizar conta" });
+  }
+});
+
+// PATCH /accounts/:id/pay — marca como pago e propaga o efeito (Compras + histórico do cliente)
+router.patch("/accounts/:id/pay", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { paymentMethod } = req.body;
+
+    const [account] = await db.select().from(financialAccountsTable).where(eq(financialAccountsTable.id, id)).limit(1);
+    if (!account) return res.status(404).json({ error: "Lançamento não encontrado" });
+
+    await db.update(financialAccountsTable)
+      .set({
+        status: "paid",
+        paidAt: new Date(),
+        paymentMethod: paymentMethod ?? account.paymentMethod,
+      })
+      .where(eq(financialAccountsTable.id, id));
+
+    // Volta o pedido para a aba Pedidos do Compras
+    if (account.purchaseOrderId) {
+      await db.update(purchaseOrdersTable)
+        .set({ status: "confirmed" })
+        .where(eq(purchaseOrdersTable.id, account.purchaseOrderId));
+    }
+
+    // Grava no histórico do cliente, se houver cliente vinculado
+    if (account.clientId) {
+      await db.insert(clientHistoryTable).values({
+        clientId: account.clientId,
+        type: "payment",
+        description: `Pagamento ${account.type === "payable" ? "efetuado" : "recebido"}: ${account.description} — R$ ${parseFloat(account.amount).toFixed(2)}${paymentMethod ? ` via ${paymentMethod}` : ""}`,
+      });
+    }
+
+    const [updated] = await db.select().from(financialAccountsTable).where(eq(financialAccountsTable.id, id)).limit(1);
+    return res.json(await enrichAccount(updated));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao registrar pagamento" });
   }
 });
 
@@ -109,6 +167,7 @@ router.delete("/accounts/:id", async (req, res) => {
     await db.delete(financialAccountsTable).where(eq(financialAccountsTable.id, parseInt(req.params.id)));
     return res.status(204).send();
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: "Erro ao excluir conta" });
   }
 });
@@ -237,6 +296,23 @@ router.get("/monthly-summary", async (req, res) => {
     return res.json(Object.entries(summaryMap).sort(([a], [b]) => a.localeCompare(b)).map(([month, data]) => ({ month, ...data, balance: data.income - data.expenses })));
   } catch (err) {
     return res.status(500).json({ error: "Erro ao buscar resumo mensal" });
+  }
+});
+
+// ── Despesas Operacionais ──────────────────────────────────────────────────────
+
+// GET /expenses
+router.get("/expenses", async (_req, res) => {
+  try {
+    const expenses = await db.select().from((await import("@workspace/db")).operationalExpensesTable);
+    return res.json(expenses.map((e: any) => ({
+      ...e,
+      amount: parseFloat(e.amount),
+      createdAt: e.createdAt.toISOString(),
+    })));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao buscar despesas" });
   }
 });
 
