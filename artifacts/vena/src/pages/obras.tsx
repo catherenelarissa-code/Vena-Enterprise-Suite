@@ -1,6 +1,3 @@
-// artifacts/vena/src/pages/obras.tsx
-// Substitua o arquivo inteiro
-
 import { useState } from "react";
 import { Link } from "wouter";
 import { useListProjects, getListProjectsQueryKey, useCreateProject, useUpdateProject } from "@workspace/api-client-react";
