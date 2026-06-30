@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import {
+impot {
   purchaseRequestsTable,
   purchaseRequestItemsTable,
   quotesTable,
