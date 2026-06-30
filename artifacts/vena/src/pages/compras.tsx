@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/format";
-import { Search, Plus, FileText, Filter, Clock, Trash2, Upload, Sparkles, X, Pencil, Check, AlertTriangle } from "lucide-react";
+import { Search, Plus, FileText, Filter, Clock, Trash2, Upload, Sparkles, X, Pencil, Check, AlertTriangle, Camera } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -73,224 +73,123 @@ type Item = { materialName: string; quantity: string; unit: string; notes: strin
 async function convertPdfToImage(file: File) {
   const data = await file.arrayBuffer();
 
-  const pdf =
-    await pdfjsLib
-      .getDocument({
-        data,
-      })
-      .promise;
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2 });
 
-  const page =
-    await pdf.getPage(1);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
 
-  const viewport =
-    page.getViewport({
-      scale: 2,
-    });
-
-  const canvas =
-    document.createElement(
-      "canvas"
-    );
-
-  const ctx =
-    canvas.getContext(
-      "2d"
-    )!;
-
-  canvas.width =
-    viewport.width;
-
-  canvas.height =
-    viewport.height;
-
-  await page.render({
-    canvasContext:
-      ctx,
-    viewport,
-  }).promise;
+  await page.render({ canvasContext: ctx, viewport }).promise;
 
   return {
-    base64:
-      canvas
-        .toDataURL(
-          "image/jpeg",
-          0.85
-        )
-        .split(",")[1],
-
-    mediaType:
-      "image/jpeg",
+    base64: canvas.toDataURL("image/jpeg", 0.85).split(",")[1],
+    mediaType: "image/jpeg",
   };
 }
 
 function OcrMaterialsUpload({
   onExtracted,
 }: {
-  onExtracted: (
-    items: Item[]
-  ) => void;
+  onExtracted: (items: Item[]) => void;
 }) {
-  const fileRef =
-    useRef<HTMLInputElement>(
-      null
-    );
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(false);
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(false);
+  async function handleFile(file: File) {
+    const isImage = file.type.startsWith("image/");
+    const isPdf = file.type === "application/pdf";
 
-  async function handleFile(
-    file: File
-  ) {
-    const isImage =
-      file.type.startsWith(
-        "image/"
-      );
-
-    const isPdf =
-      file.type ===
-      "application/pdf";
-
-    if (
-      !isImage &&
-      !isPdf
-    ) {
-      toast.error(
-        "Envie imagem ou PDF."
-      );
-
+    if (!isImage && !isPdf) {
+      toast.error("Envie imagem ou PDF.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const payload =
-        isPdf
-          ? await convertPdfToImage(
-              file
-            )
-          : await compressAndEncode(
-              file
-            );
+      const payload = isPdf
+        ? await convertPdfToImage(file)
+        : await compressAndEncode(file);
 
-      const res =
-        await fetch(
-          "/api/automation/ocr-materials",
-          {
-            method:
-              "POST",
-
-            credentials:
-              "include",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify(
-                payload
-              ),
-          }
-        );
+      const res = await fetch("/api/automation/ocr-materials", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
       if (!res.ok) {
-        throw new Error(
-          "Erro OCR"
-        );
+        throw new Error("Erro OCR");
       }
 
-      const data =
-        await res.json();
-
-      onExtracted(
-        data.items ??
-          []
-      );
-
-      toast.success(
-        "Documento lido!"
-      );
+      const data = await res.json();
+      onExtracted(data.items ?? []);
+      toast.success("Documento lido!");
     } catch {
-      toast.error(
-        "Erro ao processar documento"
-      );
+      toast.error("Erro ao processar documento");
     } finally {
-      setLoading(
-        false
-      );
+      setLoading(false);
     }
   }
 
   return (
     <div className="space-y-3">
+      <Label>Importar itens</Label>
 
-      <Label>
-        Importar itens
-      </Label>
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          e.target.value = "";
+        }}
+      />
 
-      <div
-        className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary"
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          e.target.value = "";
+        }}
+      />
 
-        onClick={() =>
-          fileRef.current?.click()
-        }
-      >
+      {loading ? (
+        <div className="border-2 border-dashed rounded-lg p-6 text-center">
+          Processando...
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => cameraRef.current?.click()}
+            className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors flex flex-col items-center gap-2"
+          >
+            <Camera className="h-6 w-6" />
+            <p className="text-sm">Tirar foto</p>
+          </button>
 
-        <input
-          ref={
-            fileRef
-          }
-
-          type="file"
-
-          accept="image/*,application/pdf"
-
-          capture="environment"
-
-          className="hidden"
-
-          onChange={(
-            e
-          ) => {
-            const file =
-              e.target
-                .files?.[0];
-
-            if (
-              file
-            ) {
-              handleFile(
-                file
-              );
-            }
-          }}
-        />
-
-        {loading ? (
-          <div>
-            Processando...
-          </div>
-        ) : (
-          <>
-            <Upload className="mx-auto mb-2 h-6 w-6" />
-
-            <p>
-              Tirar foto
-              ou enviar
-              PDF
-            </p>
-
-          </>
-        )}
-
-      </div>
-
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors flex flex-col items-center gap-2"
+          >
+            <Upload className="h-6 w-6" />
+            <p className="text-sm">Enviar imagem ou PDF</p>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
