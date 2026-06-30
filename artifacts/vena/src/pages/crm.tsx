@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Settings, Phone, Mail, FileText, Clock, User, Trash2, Edit, GripVertical, X } from "lucide-react";
+import { Plus, Settings, Phone, Mail, FileText, Clock, User, Trash2, Edit, GripVertical, Check, X } from "lucide-react";
 import { setBaseUrl } from "@workspace/api-client-react";
 
 setBaseUrl(import.meta.env.VITE_API_URL ?? "");
@@ -20,6 +20,17 @@ type Client = {
 type HistoryEntry = { id: number; type: string; description: string; created_at: string; user_name?: string };
 
 const API = import.meta.env.VITE_API_URL ?? "";
+
+// Remove qualquer trecho "Anexo: ..." que tenha vindo de importações antigas,
+// para que anexos nunca apareçam na UI, mesmo que ainda existam no texto salvo.
+function stripAnexos(notes?: string | null) {
+  if (!notes) return "";
+  return notes
+    .split("|")
+    .map(s => s.trim())
+    .filter(s => s && !/^anexo:/i.test(s))
+    .join(" ");
+}
 
 async function apiFetch(path: string, options?: RequestInit) {
   const res = await fetch(`${API}/api/crm${path}`, {
@@ -45,7 +56,6 @@ export function CRM() {
   const movedWhilePanning = useRef(false);
 
   function handleBoardMouseDown(e: React.MouseEvent) {
-    // Não inicia o pan se o clique começou em um card (que tem seu próprio drag) ou em um botão/input
     const target = e.target as HTMLElement;
     if (target.closest('[draggable="true"], button, input, select, textarea')) return;
     if (!boardRef.current) return;
@@ -65,7 +75,6 @@ export function CRM() {
     isPanning.current = false;
   }
 
-  // Evita que o clique no card abra o modal de detalhe quando o usuário só estava arrastando o board
   function handleBoardClickCapture(e: React.MouseEvent) {
     if (movedWhilePanning.current) {
       e.stopPropagation();
@@ -80,9 +89,12 @@ export function CRM() {
   const [openClientDetail, setOpenClientDetail] = useState<number | null>(null);
   const [clientDetail, setClientDetail] = useState<Client & { history?: HistoryEntry[] } | null>(null);
   const [newNote, setNewNote] = useState("");
+  const [editingClient, setEditingClient] = useState(false);
+  const [confirmDeleteClient, setConfirmDeleteClient] = useState(false);
 
   // Forms
   const [clientForm, setClientForm] = useState({ name: "", phone: "", email: "", cpf_cnpj: "", address: "", origin: "", notes: "", column_id: 0 });
+  const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", cpf_cnpj: "", address: "", origin: "", notes: "" });
   const [columnForm, setColumnForm] = useState({ name: "", color: "#F97316" });
 
   useEffect(() => { loadData(); }, []);
@@ -103,12 +115,31 @@ export function CRM() {
   async function loadClientDetail(id: number) {
     const data = await apiFetch(`/clients/${id}`);
     setClientDetail(data);
+    setEditForm({
+      name: data.name ?? "",
+      phone: data.phone ?? "",
+      email: data.email ?? "",
+      cpf_cnpj: data.cpf_cnpj ?? "",
+      address: data.address ?? "",
+      origin: data.origin ?? "",
+      notes: stripAnexos(data.notes),
+    });
+    setEditingClient(false);
+    setConfirmDeleteClient(false);
   }
 
   async function createClient() {
     await apiFetch("/clients", { method: "POST", body: JSON.stringify(clientForm) });
     setOpenNewClient(false);
     setClientForm({ name: "", phone: "", email: "", cpf_cnpj: "", address: "", origin: "", notes: "", column_id: columns[0]?.id ?? 0 });
+    loadData();
+  }
+
+  async function saveClientEdit() {
+    if (!clientDetail) return;
+    await apiFetch(`/clients/${clientDetail.id}`, { method: "PATCH", body: JSON.stringify(editForm) });
+    setEditingClient(false);
+    await loadClientDetail(clientDetail.id);
     loadData();
   }
 
@@ -150,6 +181,7 @@ export function CRM() {
     await apiFetch(`/clients/${id}`, { method: "DELETE" });
     setOpenClientDetail(null);
     setClientDetail(null);
+    setConfirmDeleteClient(false);
     loadData();
   }
 
@@ -165,6 +197,15 @@ export function CRM() {
   const typeIcon: Record<string, string> = {
     criacao: "🆕", movimentacao: "🔄", anotacao: "📝", compra: "🛒", obra: "🏗️"
   };
+
+  const editFields: { label: string; key: keyof typeof editForm; placeholder: string }[] = [
+    { label: "Nome", key: "name", placeholder: "Nome do cliente" },
+    { label: "Telefone", key: "phone", placeholder: "(00) 00000-0000" },
+    { label: "E-mail", key: "email", placeholder: "email@exemplo.com" },
+    { label: "CPF/CNPJ", key: "cpf_cnpj", placeholder: "000.000.000-00" },
+    { label: "Endereço", key: "address", placeholder: "Rua, número, cidade" },
+    { label: "Origem", key: "origin", placeholder: "Ex: Indicação, Instagram..." },
+  ];
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -233,27 +274,52 @@ export function CRM() {
                       draggable
                       onDragStart={() => handleDragStart(client.id)}
                       onClick={() => { setOpenClientDetail(client.id); loadClientDetail(client.id); }}
-                      className="rounded-lg p-3 border border-white/5 cursor-pointer hover:border-orange-500/30 transition-all group"
+                      className="group relative rounded-lg p-3 border border-white/5 cursor-pointer hover:border-orange-500/30 transition-all"
                       style={{ background: "hsl(220,25%,14%)" }}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <GripVertical className="h-3 w-3 text-white/20 group-hover:text-white/40 shrink-0" />
-                          <span className="text-sm font-medium text-white">{client.name}</span>
-                        </div>
+                      {/* Ações rápidas, aparecem só no hover */}
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setOpenClientDetail(client.id); loadClientDetail(client.id).then(() => setEditingClient(true)); }}
+                          className="h-5 w-5 flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Excluir o cliente "${client.name}"? Essa ação não pode ser desfeita.`)) {
+                              deleteClient(client.id);
+                            }
+                          }}
+                          className="h-5 w-5 flex items-center justify-center rounded text-white/40 hover:text-red-400 hover:bg-white/10"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
                       </div>
-                      {client.phone && (
-                        <div className="flex items-center gap-1.5 mt-2 ml-5">
-                          <Phone className="h-3 w-3 text-white/30" />
-                          <span className="text-xs text-white/40">{client.phone}</span>
+
+                      <div className="flex items-center gap-2 pr-10">
+                        <GripVertical className="h-3 w-3 text-white/20 group-hover:text-white/40 shrink-0" />
+                        <span className="text-sm font-medium text-white truncate">{client.name}</span>
+                      </div>
+
+                      {(client.phone || client.email) && (
+                        <div className="mt-2 ml-5 space-y-1">
+                          {client.phone && (
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="h-3 w-3 text-white/30 shrink-0" />
+                              <span className="text-xs text-white/40">{client.phone}</span>
+                            </div>
+                          )}
+                          {client.email && (
+                            <div className="flex items-center gap-1.5">
+                              <Mail className="h-3 w-3 text-white/30 shrink-0" />
+                              <span className="text-xs text-white/40 truncate">{client.email}</span>
+                            </div>
+                          )}
                         </div>
                       )}
-                      {client.email && (
-                        <div className="flex items-center gap-1.5 mt-1 ml-5">
-                          <Mail className="h-3 w-3 text-white/30" />
-                          <span className="text-xs text-white/40 truncate">{client.email}</span>
-                        </div>
-                      )}
+
                       {client.origin && (
                         <div className="mt-2 ml-5">
                           <Badge variant="outline" className="text-[10px] border-white/10 text-white/30">{client.origin}</Badge>
@@ -346,70 +412,138 @@ export function CRM() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Detalhe Cliente */}
-      <Dialog open={!!openClientDetail} onOpenChange={(o) => { if (!o) { setOpenClientDetail(null); setClientDetail(null); } }}>
+      {/* Modal Detalhe / Edição Cliente */}
+      <Dialog open={!!openClientDetail} onOpenChange={(o) => { if (!o) { setOpenClientDetail(null); setClientDetail(null); setEditingClient(false); setConfirmDeleteClient(false); } }}>
         <DialogContent className="max-w-lg border-white/10 max-h-[85vh] overflow-y-auto" style={{ background: "hsl(220,25%,11%)" }}>
           {clientDetail && (
             <>
               <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-white">{clientDetail.name}</DialogTitle>
-                  <Button variant="ghost" size="icon" onClick={() => deleteClient(clientDetail.id)} className="text-white/30 hover:text-red-400 h-7 w-7">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center justify-between gap-2">
+                  {editingClient ? (
+                    <Input
+                      value={editForm.name}
+                      onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                      className="border-white/10 bg-white/5 text-white text-base font-semibold h-8"
+                    />
+                  ) : (
+                    <DialogTitle className="text-white">{clientDetail.name}</DialogTitle>
+                  )}
+                  <div className="flex gap-1 shrink-0">
+                    {editingClient ? (
+                      <>
+                        <Button variant="ghost" size="icon" onClick={saveClientEdit} disabled={!editForm.name.trim()} className="text-green-400 hover:text-green-300 h-7 w-7">
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingClient(false); loadClientDetail(clientDetail.id); }} className="text-white/30 hover:text-white h-7 w-7">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="ghost" size="icon" onClick={() => setEditingClient(true)} className="text-white/30 hover:text-white h-7 w-7">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setConfirmDeleteClient(true)} className="text-white/30 hover:text-red-400 h-7 w-7">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </DialogHeader>
-              <div className="space-y-4 py-2">
-                {/* Informações */}
-                <div className="grid grid-cols-2 gap-3">
-                  {clientDetail.phone && (
-                    <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
-                      <Phone className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                      <span className="text-xs text-white/70">{clientDetail.phone}</span>
-                    </div>
-                  )}
-                  {clientDetail.email && (
-                    <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
-                      <Mail className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                      <span className="text-xs text-white/70 truncate">{clientDetail.email}</span>
-                    </div>
-                  )}
-                  {clientDetail.cpf_cnpj && (
-                    <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
-                      <FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                      <span className="text-xs text-white/70">{clientDetail.cpf_cnpj}</span>
-                    </div>
-                  )}
-                  {clientDetail.origin && (
-                    <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
-                      <User className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                      <span className="text-xs text-white/70">{clientDetail.origin}</span>
-                    </div>
-                  )}
-                </div>
-                {clientDetail.address && (
-                  <p className="text-xs text-white/50 px-1">📍 {clientDetail.address}</p>
-                )}
-                {clientDetail.notes && (
-                  <div className="p-3 rounded-lg border border-white/5 bg-white/5">
-                    <p className="text-xs text-white/50 mb-1">Observações</p>
-                    <p className="text-sm text-white/70">{clientDetail.notes}</p>
+
+              {/* Confirmação de exclusão */}
+              {confirmDeleteClient && (
+                <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10 flex items-center justify-between gap-3">
+                  <p className="text-xs text-red-200">Tem certeza que deseja excluir este cliente? Essa ação não pode ser desfeita.</p>
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => setConfirmDeleteClient(false)} className="border-white/10 text-white/60 h-7">Cancelar</Button>
+                    <Button size="sm" onClick={() => deleteClient(clientDetail.id)} className="bg-red-500 hover:bg-red-600 text-white h-7">Excluir</Button>
                   </div>
+                </div>
+              )}
+
+              <div className="space-y-4 py-2">
+                {editingClient ? (
+                  /* ---- Modo edição ---- */
+                  <div className="space-y-3">
+                    {editFields.filter(f => f.key !== "name").map(f => (
+                      <div key={f.key} className="space-y-1">
+                        <Label className="text-white/60 text-xs">{f.label}</Label>
+                        <Input
+                          placeholder={f.placeholder}
+                          value={editForm[f.key]}
+                          onChange={e => setEditForm(ef => ({ ...ef, [f.key]: e.target.value }))}
+                          className="border-white/10 bg-white/5 text-white placeholder:text-white/20"
+                        />
+                      </div>
+                    ))}
+                    <div className="space-y-1">
+                      <Label className="text-white/60 text-xs">Observações</Label>
+                      <Textarea
+                        value={editForm.notes}
+                        onChange={e => setEditForm(ef => ({ ...ef, notes: e.target.value }))}
+                        className="border-white/10 bg-white/5 text-white placeholder:text-white/20 resize-none"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* ---- Modo leitura ---- */
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      {clientDetail.phone && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
+                          <Phone className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                          <span className="text-xs text-white/70">{clientDetail.phone}</span>
+                        </div>
+                      )}
+                      {clientDetail.email && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
+                          <Mail className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                          <span className="text-xs text-white/70 truncate">{clientDetail.email}</span>
+                        </div>
+                      )}
+                      {clientDetail.cpf_cnpj && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
+                          <FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                          <span className="text-xs text-white/70">{clientDetail.cpf_cnpj}</span>
+                        </div>
+                      )}
+                      {clientDetail.origin && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
+                          <User className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                          <span className="text-xs text-white/70">{clientDetail.origin}</span>
+                        </div>
+                      )}
+                    </div>
+                    {clientDetail.address && (
+                      <p className="text-xs text-white/50 px-1">📍 {clientDetail.address}</p>
+                    )}
+                    {stripAnexos(clientDetail.notes) && (
+                      <div className="p-3 rounded-lg border border-white/5 bg-white/5">
+                        <p className="text-xs text-white/50 mb-1">Observações</p>
+                        <p className="text-sm text-white/70 whitespace-pre-wrap">{stripAnexos(clientDetail.notes)}</p>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Nova anotação */}
-                <div className="space-y-2">
-                  <Label className="text-white/60 text-xs">Adicionar anotação</Label>
-                  <Textarea value={newNote} onChange={e => setNewNote(e.target.value)}
-                    placeholder="Digite uma atualização ou anotação..."
-                    className="border-white/10 bg-white/5 text-white placeholder:text-white/20 resize-none" rows={2} />
-                  <Button size="sm" onClick={addNote} disabled={!newNote.trim()} className="bg-orange-500 hover:bg-orange-600 text-white">
-                    Adicionar
-                  </Button>
-                </div>
+                {!editingClient && (
+                  <div className="space-y-2">
+                    <Label className="text-white/60 text-xs">Adicionar anotação</Label>
+                    <Textarea value={newNote} onChange={e => setNewNote(e.target.value)}
+                      placeholder="Digite uma atualização ou anotação..."
+                      className="border-white/10 bg-white/5 text-white placeholder:text-white/20 resize-none" rows={2} />
+                    <Button size="sm" onClick={addNote} disabled={!newNote.trim()} className="bg-orange-500 hover:bg-orange-600 text-white">
+                      Adicionar
+                    </Button>
+                  </div>
+                )}
 
                 {/* Histórico */}
-                {clientDetail.history && clientDetail.history.length > 0 && (
+                {!editingClient && clientDetail.history && clientDetail.history.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs text-white/40 font-medium flex items-center gap-1">
                       <Clock className="h-3 w-3" /> Histórico
