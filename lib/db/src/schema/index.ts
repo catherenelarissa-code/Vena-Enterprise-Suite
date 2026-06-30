@@ -10,3 +10,4 @@ export * from "./alerts";
 export * from "./message-templates";
 export * from "./crm";
 export * from "./agenda";
+export * from "./propostas-fv";
