@@ -206,5 +206,82 @@ Não inclua markdown. Se não encontrar itens retorne { "items": [] }.`;
     return res.status(500).json({ error: err.message ?? "Erro ao processar materiais" });
   }
 });
+import { prostasFVTable } from "@workspace/db";
 
+// ── GET /api/automation/propostas ─────────────────────────────────────────────
+router.get("/propostas", async (req, res) => {
+  try {
+    const rows = await db
+      .select()
+      .from(prostasFVTable)
+      .orderBy(prostasFVTable.createdAt);
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao listar propostas" });
+  }
+});
+
+// ── POST /api/automation/propostas ────────────────────────────────────────────
+router.post("/propostas", async (req, res) => {
+  try {
+    const {
+      nomeCliente, cpfCnpj, cidade, estado, data,
+      kwp, areaM2, kwhMes, quantidadePaineis, moduloW,
+      baseInstalacao, inversor, valorAVista, valorExtenso,
+      pagamento, status,
+    } = req.body;
+
+    if (!nomeCliente) {
+      return res.status(400).json({ error: "Nome do cliente é obrigatório" });
+    }
+
+    const [created] = await db
+      .insert(prostasFVTable)
+      .values({
+        nomeCliente, cpfCnpj, cidade, estado, data,
+        kwp, areaM2, kwhMes, quantidadePaineis, moduloW,
+        baseInstalacao, inversor, valorAVista, valorExtenso,
+        pagamento: pagamento ?? [],
+        status: status ?? "rascunho",
+      })
+      .returning();
+
+    return res.status(201).json(created);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao criar proposta" });
+  }
+});
+
+// ── PATCH /api/automation/propostas/:id ───────────────────────────────────────
+router.patch("/propostas/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const updates: any = { updatedAt: new Date(), ...req.body };
+    await db
+      .update(prostasFVTable)
+      .set(updates)
+      .where(eq(prostasFVTable.id, id));
+    const [updated] = await db
+      .select()
+      .from(prostasFVTable)
+      .where(eq(prostasFVTable.id, id));
+    return res.json(updated);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao atualizar proposta" });
+  }
+});
+
+// ── DELETE /api/automation/propostas/:id ──────────────────────────────────────
+router.delete("/propostas/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.delete(prostasFVTable).where(eq(prostasFVTable.id, id));
+    return res.status(204).send();
+  } catch (err) {
+    return res.status(500).json({ error: "Erro ao excluir proposta" });
+  }
+});
 export default router;
