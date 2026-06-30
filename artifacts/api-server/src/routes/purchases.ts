@@ -8,6 +8,7 @@ import {
   purchaseOrdersTable,
   projectsTable,
   suppliersTable,
+  financialAccountsTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -214,6 +215,16 @@ router.post("/quotes/:id/approve", async (req, res) => {
   }).returning();
 
   await db.update(purchaseRequestsTable).set({ status: "ordered" }).where(eq(purchaseRequestsTable.id, quote.purchaseRequestId));
+  await db.insert(financialAccountsTable).values({
+    type: "payable",
+    description: `Pedido de compra #${order.id} — ${pr?.title ?? "Sem título"}`,
+    amount: enriched.totalAmount.toString(),
+    dueDate: new Date().toISOString().slice(0, 10),
+    status: "pending",
+    supplierId: quote.supplierId,
+    projectId: pr?.projectId ?? null,
+    purchaseOrderId: order.id,
+  });
 
   const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, quote.supplierId)).limit(1);
 
