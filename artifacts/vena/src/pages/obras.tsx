@@ -45,6 +45,9 @@ const PROJECT_STATUS = [
   { value: "cancelled", label: "Cancelada" },
 ];
 
+// Sentinela pra "todos" — shadcn Select não aceita value=""
+const ALL = "all";
+
 function getStatusColor(status: string) {
   switch (status) {
     case "active": return "bg-secondary/10 text-secondary border-secondary/20";
@@ -184,7 +187,7 @@ function ProjectModal({
             </div>
           </div>
 
-          {/* Centro de custo — campo principal */}
+          {/* Centro de custo */}
           <div className="space-y-1.5">
             <Label className="text-base font-semibold">Centro de Custo * <span className="text-xs font-normal text-muted-foreground">(nome em destaque)</span></Label>
             <Input
@@ -218,10 +221,11 @@ function ProjectModal({
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> Cliente *</Label>
             {clients.length > 0 ? (
-              <Select value={form.client} onValueChange={v => setForm(f => ({ ...f, client: v }))}>
+              <Select value={form.client || ALL} onValueChange={v => setForm(f => ({ ...f, client: v === ALL ? "" : v }))}>
                 <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                 <SelectContent>
-                  {clients.map((c: any) => (
+                  <SelectItem value={ALL}>Selecione o cliente</SelectItem>
+                  {clients.filter(c => c.name).map((c: any) => (
                     <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -274,7 +278,7 @@ function ProjectModal({
             </div>
           </div>
 
-          {/* Tags de andamento */}
+          {/* Tags */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Tags de Andamento</Label>
             <div className="flex flex-wrap gap-2">
@@ -333,7 +337,6 @@ function ProjectCard({ project, onEdit }: { project: any; onEdit: (p: any) => vo
       <CardHeader className="pb-3 bg-muted/30">
         <div className="flex justify-between items-start gap-2">
           <div className="flex-1 min-w-0">
-            {/* Centro de custo em destaque */}
             <div className="flex items-center gap-2 mb-1">
               <span className="text-lg">{getTypeIcon(project.type)}</span>
               <CardTitle className="text-lg leading-tight truncate" title={project.costCenter}>
@@ -441,8 +444,8 @@ function ProjectCard({ project, onEdit }: { project: any; onEdit: (p: any) => vo
 
 export function Obras() {
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterType, setFilterType] = useState(ALL);
+  const [filterStatus, setFilterStatus] = useState(ALL);
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState<any | null>(null);
   const [clients, setClients] = useState<any[]>([]);
@@ -461,8 +464,8 @@ export function Obras() {
     const matchSearch = !search ||
       (p.costCenter ?? p.name).toLowerCase().includes(search.toLowerCase()) ||
       p.client.toLowerCase().includes(search.toLowerCase());
-    const matchType = !filterType || p.type === filterType;
-    const matchStatus = !filterStatus || p.status === filterStatus;
+    const matchType = filterType === ALL || p.type === filterType;
+    const matchStatus = filterStatus === ALL || p.status === filterStatus;
     return matchSearch && matchType && matchStatus;
   });
 
@@ -547,7 +550,7 @@ export function Obras() {
             <SelectValue placeholder="Tipo de obra" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos os tipos</SelectItem>
+            <SelectItem value={ALL}>Todos os tipos</SelectItem>
             {PROJECT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -556,7 +559,7 @@ export function Obras() {
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos os status</SelectItem>
+            <SelectItem value={ALL}>Todos os status</SelectItem>
             {PROJECT_STATUS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
