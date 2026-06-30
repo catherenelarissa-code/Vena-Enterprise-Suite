@@ -1,4 +1,4 @@
-exort type PagamentoLinha = {
+export type PagamentoLinha = {
   forma: string;
   qtd: string;
   valor: string;
