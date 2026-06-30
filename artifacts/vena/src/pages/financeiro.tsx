@@ -21,6 +21,7 @@ import {
   Trash2, Pencil, Download, Paperclip, Tag, User, X, TrendingDown, BarChart3,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { DespesasOperacionais } from "./DespesasOperacionais";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
@@ -70,8 +71,9 @@ type Account = {
   id: number; type: string; description: string; amount: number;
   dueDate: string; status: string; category?: string;
   supplierId?: number; supplierName?: string;
-  clientName?: string; attachmentUrl?: string; notes?: string;
+  clientId?: number; clientName?: string; attachmentUrl?: string; notes?: string;
   projectId?: number; projectName?: string; paidAt?: string;
+  purchaseOrderId?: number; paymentMethod?: string;
 };
 
 type Client = { id: number; name: string; };
@@ -99,7 +101,8 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
     dueDate: editing?.dueDate ?? "",
     category: editing?.category ?? "",
     supplierId: editing?.supplierId?.toString() ?? "",
-    clientName: editing?.clientName ?? "",
+    clientId: editing?.clientId?.toString() ?? "",
+    paymentMethod: editing?.paymentMethod ?? "",
     attachmentUrl: editing?.attachmentUrl ?? "",
     notes: editing?.notes ?? "",
   });
@@ -138,7 +141,8 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
         dueDate: form.dueDate,
         category: form.category || null,
         supplierId: form.supplierId && form.supplierId !== "none" ? parseInt(form.supplierId) : undefined,
-        clientName: form.clientName && form.clientName !== "none" ? form.clientName : null,
+        clientId: form.clientId && form.clientId !== "none" ? parseInt(form.clientId) : null,
+        paymentMethod: form.paymentMethod || null,
         attachmentUrl: form.attachmentUrl || null,
         notes: form.notes || null,
       };
@@ -250,18 +254,30 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
           {form.type === "receivable" && (
             <div className="space-y-1.5">
               <Label className="text-white/60 text-xs flex items-center gap-1"><User className="h-3.5 w-3.5" /> Cliente</Label>
-              <Select value={form.clientName} onValueChange={v => setForm(f => ({ ...f, clientName: v }))}>
+              <Select value={form.clientId} onValueChange={v => setForm(f => ({ ...f, clientId: v }))}>
                 <SelectTrigger className="border-white/10 bg-white/5 text-white"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
                 <SelectContent style={{ background: "hsl(220,25%,13%)" }}>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  {clients.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                  {clients.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Input placeholder="Ou digite o nome manualmente" value={form.clientName}
-                onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))}
-                className="border-white/10 bg-white/5 text-white placeholder:text-white/20 mt-1" />
+              <p className="text-[11px] text-white/30 mt-1">Os pagamentos vinculados a este cliente aparecerão no histórico dele.</p>
             </div>
           )}
+
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Método de pagamento</Label>
+            <Select value={form.paymentMethod} onValueChange={v => setForm(f => ({ ...f, paymentMethod: v }))}>
+              <SelectTrigger className="border-white/10 bg-white/5 text-white"><SelectValue placeholder="Selecione (opcional)" /></SelectTrigger>
+              <SelectContent style={{ background: "hsl(220,25%,13%)" }}>
+                <SelectItem value="pix">Pix</SelectItem>
+                <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
+                <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                <SelectItem value="boleto">Boleto</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="space-y-1.5">
             <Label className="text-white/60 text-xs flex items-center gap-2">
@@ -469,7 +485,6 @@ export function Financeiro() {
   const { data: receivable, isLoading: isLoadingReceivable } = useListFinancialAccounts(
     { type: "receivable" }, { query: { queryKey: getListFinancialAccountsQueryKey({ type: "receivable" }) } });
   const { data: suppliers } = useListSuppliers({}, {});
-  const { mutate: updateAccount } = useUpdateFinancialAccount();
 
   const totalPayable = payable?.filter((a: any) => a.status !== 'paid').reduce((s: number, a: any) => s + a.amount, 0) ?? 0;
   const totalReceivable = receivable?.filter((a: any) => a.status !== 'paid').reduce((s: number, a: any) => s + a.amount, 0) ?? 0;
@@ -491,8 +506,14 @@ export function Financeiro() {
     queryClient.invalidateQueries({ queryKey: getListFinancialAccountsQueryKey({ type: "receivable" }) });
   }
 
-  function handleMarkPaid(id: number) {
-    updateAccount({ id, data: { status: "paid", paidAt: new Date().toISOString() } }, { onSuccess: refreshAll });
+  async function handleMarkPaid(id: number) {
+    try {
+      await apiCall(`/accounts/${id}/pay`, { method: "PATCH", body: JSON.stringify({}) });
+      toast.success("Pagamento registrado!");
+      refreshAll();
+    } catch {
+      toast.error("Erro ao registrar pagamento.");
+    }
   }
 
   async function handleDelete(id: number) {
@@ -584,6 +605,9 @@ export function Financeiro() {
         <TabsList className="border border-white/10 bg-transparent">
           <TabsTrigger value="payable" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white text-white/50">A Pagar</TabsTrigger>
           <TabsTrigger value="receivable" className="data-[state=active]:bg-green-500 data-[state=active]:text-white text-white/50">A Receber</TabsTrigger>
+          <TabsTrigger value="expenses" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+            <Paperclip className="h-3.5 w-3.5 mr-1" /> Despesas Operacionais
+          </TabsTrigger>
           <TabsTrigger value="discounts" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
             <BarChart3 className="h-3.5 w-3.5 mr-1" /> Fornecedores
           </TabsTrigger>
@@ -593,6 +617,9 @@ export function Financeiro() {
         </TabsContent>
         <TabsContent value="receivable" className="mt-6">
           <FinancialList accounts={receivable as Account[]} isLoading={isLoadingReceivable} onMarkPaid={handleMarkPaid} onEdit={handleEdit} onDelete={handleDelete} />
+        </TabsContent>
+        <TabsContent value="expenses" className="mt-6">
+          <DespesasOperacionais />
         </TabsContent>
         <TabsContent value="discounts" className="mt-6">
           <DiscountDashboard />
