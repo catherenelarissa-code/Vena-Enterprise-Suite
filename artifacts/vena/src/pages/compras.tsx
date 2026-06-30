@@ -1,3 +1,4 @@
+import * as pdfjsLib from "pdfjs-dist";
 import { useState, useRef } from "react";
 import { Link } from "wouter";
 import {
@@ -68,8 +69,6 @@ async function compressAndEncode(file: File): Promise<{ base64: string; mediaTyp
 type Item = { materialName: string; quantity: string; unit: string; notes: string };
 
 // ── OCR Upload ────────────────────────────────────────────────────────────────
-
-import * as pdfjsLib from "pdfjs-dist";
 
 async function convertPdfToImage(file: File) {
   const data = await file.arrayBuffer();
