@@ -137,8 +137,8 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
         amount: parseFloat(form.amount.replace(",", ".")),
         dueDate: form.dueDate,
         category: form.category || null,
-        supplierId: form.supplierId ? parseInt(form.supplierId) : undefined,
-        clientName: form.clientName || null,
+        supplierId: form.supplierId && form.supplierId !== "none" ? parseInt(form.supplierId) : undefined,
+        clientName: form.clientName && form.clientName !== "none" ? form.clientName : null,
         attachmentUrl: form.attachmentUrl || null,
         notes: form.notes || null,
       };
@@ -240,7 +240,7 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
               <Select value={form.supplierId} onValueChange={v => setForm(f => ({ ...f, supplierId: v }))}>
                 <SelectTrigger className="border-white/10 bg-white/5 text-white"><SelectValue placeholder="Selecione (opcional)" /></SelectTrigger>
                 <SelectContent style={{ background: "hsl(220,25%,13%)" }}>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -253,7 +253,7 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
               <Select value={form.clientName} onValueChange={v => setForm(f => ({ ...f, clientName: v }))}>
                 <SelectTrigger className="border-white/10 bg-white/5 text-white"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
                 <SelectContent style={{ background: "hsl(220,25%,13%)" }}>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {clients.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
