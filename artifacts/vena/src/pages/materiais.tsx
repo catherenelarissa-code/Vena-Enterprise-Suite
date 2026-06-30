@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useListMaterials,
   getListMaterialsQueryKey,
@@ -23,6 +23,8 @@ import {
   Pencil, ArrowDown, ArrowUp, History, X, Download,
 } from "lucide-react";
 
+const API = import.meta.env.VITE_API_URL ?? "";
+
 // ── Constantes ───────────────────────────────────────────────────────────────
 
 const CATEGORIES = [
@@ -43,23 +45,28 @@ type Material = {
   lastPurchasePrice?: number | null;
 };
 
+type Client = { id: number; name: string };
+
 type Movement = {
   id: number;
   type: "entrada" | "saida";
   quantity: number;
   reason?: string;
+  withdrawn_by?: string;
+  client_name?: string;
   projectName?: string;
-  createdAt: string;
+  createdAt?: string;
+  created_at?: string;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function postMovement(materialId: number, payload: object) {
-  const res = await fetch(`/api/materials/${materialId}/movements`, {
+  const res = await fetch(`${API}/api/stock-movements`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ material_id: materialId, ...payload }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Erro desconhecido" }));
@@ -69,8 +76,14 @@ async function postMovement(materialId: number, payload: object) {
 }
 
 async function fetchMovements(materialId: number): Promise<Movement[]> {
-  const res = await fetch(`/api/materials/${materialId}/movements`, { credentials: "include" });
+  const res = await fetch(`${API}/api/stock-movements?material_id=${materialId}`, { credentials: "include" });
   if (!res.ok) throw new Error("Erro ao buscar histórico");
+  return res.json();
+}
+
+async function fetchClients(): Promise<Client[]> {
+  const res = await fetch(`${API}/api/crm/clients`, { credentials: "include" });
+  if (!res.ok) return [];
   return res.json();
 }
 
@@ -226,7 +239,14 @@ function MovementModal({
   const [qty, setQty] = useState("");
   const [projectId, setProjectId] = useState<string>("");
   const [reason, setReason] = useState("");
+  const [withdrawnBy, setWithdrawnBy] = useState("");
+  const [clientId, setClientId] = useState<string>("");
+  const [clients, setClients] = useState<Client[]>([]);
   const [isPending, setIsPending] = useState(false);
+
+  useEffect(() => {
+    fetchClients().then(setClients).catch(() => {});
+  }, []);
 
   const qtyNum = parseFloat(qty) || 0;
   const stockInsufficient = type === "saida" && qtyNum > material.currentStock;
@@ -240,8 +260,9 @@ function MovementModal({
       await postMovement(material.id, {
         type,
         quantity: qtyNum,
-        projectId: projectId ? parseInt(projectId) : undefined,
-        reason: reason || undefined,
+        notes: reason || undefined,
+        withdrawn_by: withdrawnBy || undefined,
+        client_id: type === "saida" && clientId ? parseInt(clientId) : undefined,
       });
       queryClient.invalidateQueries({ queryKey: getListMaterialsQueryKey() });
       toast.success(type === "entrada" ? "Entrada registrada!" : "Saída registrada!");
@@ -300,6 +321,29 @@ function MovementModal({
             )}
           </div>
 
+          <div className="space-y-1.5">
+            <Label>Quem fez a retirada</Label>
+            <Input
+              placeholder="Nome de quem retirou/recebeu o material"
+              value={withdrawnBy}
+              onChange={(e) => setWithdrawnBy(e.target.value)}
+            />
+          </div>
+
+          {type === "saida" && (
+            <div className="space-y-1.5">
+              <Label>Cliente (obra de destino)</Label>
+              <Select value={clientId} onValueChange={setClientId}>
+                <SelectTrigger><SelectValue placeholder="Nenhum (opcional)" /></SelectTrigger>
+                <SelectContent>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {projects && projects.length > 0 && (
             <div className="space-y-1.5">
               <Label>Obra vinculada</Label>
@@ -342,12 +386,12 @@ function HistoryModal({ material, onClose }: { material: Material; onClose: () =
   const [movements, setMovements] = useState<Movement[] | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useState(() => {
+  useEffect(() => {
     fetchMovements(material.id)
       .then(setMovements)
       .catch(() => toast.error("Erro ao carregar histórico."))
       .finally(() => setLoading(false));
-  });
+  }, [material.id]);
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -370,10 +414,12 @@ function HistoryModal({ material, onClose }: { material: Material; onClose: () =
                       {m.type === "entrada" ? "+" : "-"}{m.quantity} {material.unit}
                     </span>
                     <span className="text-xs text-muted-foreground shrink-0">
-                      {new Date(m.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(m.createdAt ?? m.created_at ?? "").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
                   {m.reason && <p className="text-xs text-muted-foreground mt-0.5 truncate">{m.reason}</p>}
+                  {m.withdrawn_by && <p className="text-xs text-muted-foreground mt-0.5">Retirado por: {m.withdrawn_by}</p>}
+                  {m.client_name && <p className="text-xs text-primary mt-0.5">Cliente: {m.client_name}</p>}
                   {m.projectName && <p className="text-xs text-primary mt-0.5">Obra: {m.projectName}</p>}
                 </div>
               </div>
