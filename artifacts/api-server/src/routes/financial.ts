@@ -8,6 +8,8 @@ import {
   clientsTable,
   clientHistoryTable,
   purchaseOrdersTable,
+  operationalExpensesTable,
+  expenseTypeTagsTable,
 } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 
@@ -137,14 +139,12 @@ router.patch("/accounts/:id/pay", async (req, res) => {
       })
       .where(eq(financialAccountsTable.id, id));
 
-    // Volta o pedido para a aba Pedidos do Compras
     if (account.purchaseOrderId) {
       await db.update(purchaseOrdersTable)
         .set({ status: "confirmed" })
         .where(eq(purchaseOrdersTable.id, account.purchaseOrderId));
     }
 
-    // Grava no histórico do cliente, se houver cliente vinculado
     if (account.clientId) {
       await db.insert(clientHistoryTable).values({
         clientId: account.clientId,
@@ -233,7 +233,7 @@ router.get("/export-csv", async (req, res) => {
   }
 });
 
-// GET /supplier-discounts - Dashboard de descontos com fornecedores
+// GET /supplier-discounts
 router.get("/supplier-discounts", async (req, res) => {
   try {
     const suppliers = await db.select().from(suppliersTable);
@@ -269,6 +269,7 @@ router.get("/supplier-discounts", async (req, res) => {
   }
 });
 
+// GET /expenses-by-project
 router.get("/expenses-by-project", async (req, res) => {
   try {
     const projects = await db.select().from(projectsTable);
@@ -283,6 +284,7 @@ router.get("/expenses-by-project", async (req, res) => {
   }
 });
 
+// GET /monthly-summary
 router.get("/monthly-summary", async (req, res) => {
   try {
     const accounts = await db.select().from(financialAccountsTable);
@@ -304,7 +306,7 @@ router.get("/monthly-summary", async (req, res) => {
 // GET /expenses
 router.get("/expenses", async (_req, res) => {
   try {
-    const expenses = await db.select().from((await import("@workspace/db")).operationalExpensesTable);
+    const expenses = await db.select().from(operationalExpensesTable).orderBy(desc(operationalExpensesTable.createdAt));
     return res.json(expenses.map((e: any) => ({
       ...e,
       amount: parseFloat(e.amount),
@@ -313,6 +315,59 @@ router.get("/expenses", async (_req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Erro ao buscar despesas" });
+  }
+});
+
+// POST /expenses
+router.post("/expenses", async (req, res) => {
+  try {
+    const { expenseType, description, supplierName, amount, paymentMethod, attachmentUrl, ocrRawText } = req.body;
+    if (!expenseType || !description || !amount || !paymentMethod) {
+      return res.status(400).json({ error: "Tipo, descrição, valor e método de pagamento são obrigatórios" });
+    }
+    const [expense] = await db.insert(operationalExpensesTable).values({
+      expenseType, description, supplierName: supplierName || null,
+      amount: amount.toString(),
+      paymentMethod, attachmentUrl: attachmentUrl || null, ocrRawText: ocrRawText || null,
+    }).returning();
+    return res.status(201).json({ ...expense, amount: parseFloat(expense.amount), createdAt: expense.createdAt.toISOString() });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao criar despesa" });
+  }
+});
+
+// DELETE /expenses/:id
+router.delete("/expenses/:id", async (req, res) => {
+  try {
+    await db.delete(operationalExpensesTable).where(eq(operationalExpensesTable.id, parseInt(req.params.id)));
+    return res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao excluir despesa" });
+  }
+});
+
+// GET /expense-tags
+router.get("/expense-tags", async (_req, res) => {
+  try {
+    return res.json(await db.select().from(expenseTypeTagsTable));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao buscar tags" });
+  }
+});
+
+// POST /expense-tags
+router.post("/expense-tags", async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Nome obrigatório" });
+    const [tag] = await db.insert(expenseTypeTagsTable).values({ name }).returning();
+    return res.status(201).json(tag);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao criar tag" });
   }
 });
 
