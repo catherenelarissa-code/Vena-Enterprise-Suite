@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import * as pdfjsLib from "pdfjs-dist";
-import { Card, CardContent } from "@/components/ui/card";
+import { Car, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
