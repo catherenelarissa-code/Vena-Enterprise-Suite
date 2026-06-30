@@ -440,8 +440,6 @@ export function Automacao() {
         </Button>
       </div>
 
-</div>
-
       {/* Abas principais */}
       <div className="flex gap-1 border-b">
         <button
@@ -470,117 +468,124 @@ export function Automacao() {
 
       {activeTab === "templates" && (
         <>
-      {/* Filtro por etiqueta */}
-          
-         
-          >
-            Todos
-          </button>
-          {LABEL_OPTIONS.map((opt) => {
-            const count = templates.filter((t) => t.label === opt.value).length;
-            if (count === 0) return null;
-            return (
+          {/* Filtro por etiqueta */}
+          {templates.length > 0 && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs text-muted-foreground flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Filtrar:</span>
               <button
-                key={opt.value}
                 type="button"
-                onClick={() => setFilterLabel(opt.value)}
+                onClick={() => setFilterLabel("")}
                 className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
-                  filterLabel === opt.value
-                    ? opt.color + " ring-2 ring-offset-1 ring-current"
-                    : "bg-background text-muted-foreground border-border hover:border-primary/40"
+                  filterLabel === "" ? "bg-foreground text-background border-foreground" : "bg-background text-muted-foreground border-border hover:border-primary/40"
                 }`}
               >
-                {opt.label} <span className="opacity-60">({count})</span>
+                Todos
               </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Cards */}
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-44 rounded-xl" />)}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="py-20 text-center border rounded-xl bg-card">
-          <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
-          <p className="font-medium text-muted-foreground">
-            {filterLabel ? "Nenhum modelo com essa etiqueta." : "Nenhum modelo criado ainda."}
-          </p>
-          {!filterLabel && (
-            <>
-              <p className="text-sm text-muted-foreground mt-1 mb-4">
-                Crie modelos de mensagem com campos variáveis para envio rápido.
-              </p>
-              <Button onClick={() => setModalForm({ open: true, editing: null })}>
-                <Plus className="mr-2 h-4 w-4" /> Criar primeiro modelo
-              </Button>
-            </>
+              {LABEL_OPTIONS.map((opt) => {
+                const count = templates.filter((t) => t.label === opt.value).length;
+                if (count === 0) return null;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFilterLabel(opt.value)}
+                    className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+                      filterLabel === opt.value
+                        ? opt.color + " ring-2 ring-offset-1 ring-current"
+                        : "bg-background text-muted-foreground border-border hover:border-primary/40"
+                    }`}
+                  >
+                    {opt.label} <span className="opacity-60">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
           )}
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((t) => {
-            const vars = extractVariables(t.template);
-            const labelInfo = getLabelInfo(t.label);
-            return (
-              <Card key={t.id} className="flex flex-col hover:border-primary/50 transition-colors">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <CardTitle className="text-base truncate">{t.name}</CardTitle>
-                        {labelInfo && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${labelInfo.color}`}>
-                            {labelInfo.label}
-                          </span>
-                        )}
-                      </div>
-                      {t.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.description}</p>}
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModalForm({ open: true, editing: t })}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => handleDelete(t.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 space-y-3">
-                  <div className="p-3 rounded-md bg-muted/40 text-xs font-mono text-muted-foreground line-clamp-3 leading-relaxed">
-                    {t.template}
-                  </div>
-                  {vars.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {vars.slice(0, 4).map((v) => (
-                        <Badge key={v} variant="outline" className="text-xs font-mono px-1.5">{`{${v}}`}</Badge>
-                      ))}
-                      {vars.length > 4 && <Badge variant="outline" className="text-xs">+{vars.length - 4}</Badge>}
-                    </div>
-                  )}
-                  <Button className="w-full gap-2 mt-auto" onClick={() => setActiveTemplate(t)}>
-                    <FileText className="h-4 w-4" /> Usar modelo <ChevronRight className="h-4 w-4 ml-auto" />
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
 
-      {modalForm.open && (
-        <TemplateModal
-          editing={modalForm.editing}
-          onClose={() => setModalForm({ open: false, editing: null })}
-          onSaved={loadTemplates}
-        />
-      )}
-     {activeTemplate && (
-        <UseTemplatePanel template={activeTemplate} onClose={() => setActiveTemplate(null)} />
-      )}
+          {/* Cards */}
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-44 rounded-xl" />)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-20 text-center border rounded-xl bg-card">
+              <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
+              <p className="font-medium text-muted-foreground">
+                {filterLabel ? "Nenhum modelo com essa etiqueta." : "Nenhum modelo criado ainda."}
+              </p>
+              {!filterLabel && (
+                <>
+                  <p className="text-sm text-muted-foreground mt-1 mb-4">
+                    Crie modelos de mensagem com campos variáveis para envio rápido.
+                  </p>
+                  <Button onClick={() => setModalForm({ open: true, editing: null })}>
+                    <Plus className="mr-2 h-4 w-4" /> Criar primeiro modelo
+                  </Button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((t) => {
+                const vars = extractVariables(t.template);
+                const labelInfo = getLabelInfo(t.label);
+                return (
+                  <Card key={t.id} className="flex flex-col hover:border-primary/50 transition-colors">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <CardTitle className="text-base truncate">{t.name}</CardTitle>
+                            {labelInfo && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${labelInfo.color}`}>
+                                {labelInfo.label}
+                              </span>
+                            )}
+                          </div>
+                          {t.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.description}</p>}
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModalForm({ open: true, editing: t })}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => handleDelete(t.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 space-y-3">
+                      <div className="p-3 rounded-md bg-muted/40 text-xs font-mono text-muted-foreground line-clamp-3 leading-relaxed">
+                        {t.template}
+                      </div>
+                      {vars.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {vars.slice(0, 4).map((v) => (
+                            <Badge key={v} variant="outline" className="text-xs font-mono px-1.5">{`{${v}}`}</Badge>
+                          ))}
+                          {vars.length > 4 && <Badge variant="outline" className="text-xs">+{vars.length - 4}</Badge>}
+                        </div>
+                      )}
+                      <Button className="w-full gap-2 mt-auto" onClick={() => setActiveTemplate(t)}>
+                        <FileText className="h-4 w-4" /> Usar modelo <ChevronRight className="h-4 w-4 ml-auto" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {modalForm.open && (
+            <TemplateModal
+              editing={modalForm.editing}
+              onClose={() => setModalForm({ open: false, editing: null })}
+              onSaved={loadTemplates}
+            />
+          )}
+          {activeTemplate && (
+            <UseTemplatePanel template={activeTemplate} onClose={() => setActiveTemplate(null)} />
+          )}
         </>
       )}
     </div>
