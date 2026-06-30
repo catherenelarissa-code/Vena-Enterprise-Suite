@@ -1,6 +1,4 @@
 import stockMovementsRouter from "./stock-movements";
-// ...
-router.use("/stock-movements", stockMovementsRouter);
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
@@ -29,5 +27,6 @@ router.use("/price-monitor", priceMonitorRouter);
 router.use("/automation", automationRouter);
 router.use("/crm", crmRouter);
 router.use("/agenda", agendaRouter);
+router.use("/stock-movements", stockMovementsRouter);
 
 export default router;
