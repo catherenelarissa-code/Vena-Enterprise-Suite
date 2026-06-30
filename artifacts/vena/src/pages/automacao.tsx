@@ -401,6 +401,7 @@ export function Automacao() {
   const [modalForm, setModalForm] = useState<{ open: boolean; editing: Template | null }>({ open: false, editing: null });
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
   const [filterLabel, setFilterLabel] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"templates" | "propostas">("templates");
 
   useEffect(() => { loadTemplates(); }, []);
 
@@ -439,8 +440,39 @@ export function Automacao() {
         </Button>
       </div>
 
+</div>
+
+      {/* Abas principais */}
+      <div className="flex gap-1 border-b">
+        <button
+          onClick={() => setActiveTab("templates")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "templates"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          💬 Modelos de Mensagem
+        </button>
+        <button
+          onClick={() => setActiveTab("propostas")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "propostas"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          ⚡ Propostas Fotovoltaicas
+        </button>
+      </div>
+
+      {activeTab === "propostas" && <PropostaFV />}
+
+      {activeTab === "templates" && (
+        <>
       {/* Filtro por etiqueta */}
-      {templates.length > 0 && (
+          
+          {templates.length > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-xs text-muted-foreground flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Filtrar:</span>
           <button
@@ -554,8 +586,10 @@ export function Automacao() {
           onSaved={loadTemplates}
         />
       )}
-      {activeTemplate && (
+     {activeTemplate && (
         <UseTemplatePanel template={activeTemplate} onClose={() => setActiveTemplate(null)} />
+      )}
+        </>
       )}
     </div>
   );
