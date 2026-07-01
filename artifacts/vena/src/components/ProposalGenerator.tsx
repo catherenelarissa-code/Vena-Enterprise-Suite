@@ -116,7 +116,7 @@ export function ProposalGenerator() {
     setPreviewOpen(true);
   };
 
-  // Generate and download PDF
+  // Generate and download PDF using backend endpoint
   const { mutate: generatePDF, isPending } = useMutation({
     mutationFn: async () => {
       if (!previewHtml) {
@@ -124,12 +124,12 @@ export function ProposalGenerator() {
         return;
       }
 
-      const res = await fetch("/api/automation/pdf", {
+      const res = await fetch("/api/automation/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           html: previewHtml,
-          clientId: selectedClient ? parseInt(selectedClient) : null,
+          clientId: selectedClient ? parseInt(selectedClient) : undefined,
           proposalId: null,
           fileName: `proposta-${proposalData.nomeCliente}-${new Date().toISOString().split('T')[0]}.pdf`,
         }),
@@ -137,7 +137,7 @@ export function ProposalGenerator() {
 
       if (!res.ok) throw new Error("Erro ao gerar PDF");
 
-      // Download the PDF
+      // Receive PDF blob from backend and download
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -148,8 +148,15 @@ export function ProposalGenerator() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success("PDF gerado e salvo!");
+      // Try to read file id from header
+      const fileIdHeader = res.headers.get("X-File-Id");
+      const clientIdNum = selectedClient ? parseInt(selectedClient) : undefined;
+
+      // Invalidate client files queries so UI updates
       queryClient.invalidateQueries({ queryKey: ["client-files"] });
+      if (clientIdNum) queryClient.invalidateQueries({ queryKey: ["client-files", clientIdNum] });
+
+      toast.success(`PDF gerado e salvo!${fileIdHeader ? ` (id: ${fileIdHeader})` : ""}`);
     },
     onError: (err: any) => {
       toast.error(err.message || "Erro ao gerar PDF");
