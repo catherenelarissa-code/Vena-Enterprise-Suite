@@ -1,0 +1,6 @@
+{
+  "commit":"Add apps/web Vite React app and proposals UI",
+  "message":"feat(proposals): scaffold frontend app and implement ProposalTemplateEditor, ProposalGenerator, upload helper, and services",
+  "authorName":"github-copilot",
+  "authorEmail":"copilot@github.com"
+}

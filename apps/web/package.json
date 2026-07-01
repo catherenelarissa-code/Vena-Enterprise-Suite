@@ -1,0 +1,23 @@
+# apps/web package
+{
+  "name": "apps-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "@tanstack/react-query": "^5.90.21",
+    "@workspace/api-client-react": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^7.3.2",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "^5.2.2"
+  }
+}
