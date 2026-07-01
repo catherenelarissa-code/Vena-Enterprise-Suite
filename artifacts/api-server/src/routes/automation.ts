@@ -214,7 +214,7 @@ async function handleGeneratePdf(req: any, res: any) {
     try {
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: "networkidle0" });
-      const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
+      const pdfBuffer = Buffer.from(await page.pdf({ format: "A4", printBackground: true }));
 
       // Save in DB
       const [created] = await db.insert(filesTable).values({
@@ -223,13 +223,11 @@ async function handleGeneratePdf(req: any, res: any) {
         data: pdfBuffer,
         clientId: clientId ?? null,
         proposalId: proposalId ?? null,
-      } as any).returning();
-
-      const fileId = (created as any).id;
+      }).returning();
 
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${(created as any).filename}"`);
-      res.setHeader("X-File-Id", String(fileId));
+      res.setHeader("Content-Disposition", `attachment; filename="${created.filename}"`);
+      res.setHeader("X-File-Id", String(created.id));
       return res.send(pdfBuffer);
     } finally {
       await browser.close();
