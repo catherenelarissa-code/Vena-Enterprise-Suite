@@ -1,10 +1,10 @@
 import { Router } from "express";
 import multer from "multer";
-import { db } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { db, filesTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // POST /api/client-files/upload
 router.post("/upload", upload.single("file"), async (req, res) => {
@@ -15,18 +15,21 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     if (!file) return res.status(400).json({ error: "Arquivo é obrigatório" });
 
-    // TODO: Integrar com a tabela `files` após criar migration.
-    // Por enquanto apenas retorna metadados.
-    // Quando a tabela existir, inserir SQL para gravar `file.buffer` em bytea.
-
-    // Example return structure compatible with frontend expectations
-    return res.status(201).json({
+    const [created] = await db.insert(filesTable).values({
       filename: file.originalname,
       contentType: file.mimetype,
-      size: file.size,
-      clientId,
-      proposalId,
-      // id: createdId
+      data: file.buffer,
+      clientId: clientId ?? null,
+      proposalId: proposalId ?? null,
+    } as any).returning();
+
+    return res.status(201).json({
+      id: (created as any).id,
+      filename: (created as any).filename,
+      contentType: (created as any).contentType,
+      clientId: (created as any).clientId,
+      proposalId: (created as any).proposalId,
+      createdAt: (created as any).createdAt,
     });
   } catch (err) {
     console.error(err);
@@ -35,12 +38,17 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 });
 
 // GET /api/client-files/:id
-router.get(":id", async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    // TODO: Buscar arquivo na tabela `files` e fazer stream
-    // Exemplo de resposta enquanto migration não existir:
-    return res.status(501).json({ error: "Not Implemented - retrieve file by id (pending migration)" });
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+    const [row] = await db.select().from(filesTable).where(eq(filesTable.id, id));
+    if (!row) return res.status(404).json({ error: "Arquivo não encontrado" });
+
+    res.setHeader("Content-Type", row.contentType || "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${row.filename}"`);
+    return res.send(row.data as Buffer);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Erro ao buscar arquivo" });
@@ -51,8 +59,17 @@ router.get(":id", async (req, res) => {
 router.get("/client/:clientId", async (req, res) => {
   try {
     const clientId = parseInt(req.params.clientId);
-    // TODO: listar arquivos associados ao clientId na tabela `files`
-    return res.status(501).json({ error: "Not Implemented - list files for client (pending migration)" });
+    if (isNaN(clientId)) return res.status(400).json({ error: "clientId inválido" });
+
+    const rows = await db.select().from(filesTable).where(eq(filesTable.clientId, clientId)).orderBy(filesTable.createdAt);
+    return res.json(rows.map(r => ({
+      id: r.id,
+      filename: r.filename,
+      contentType: r.contentType,
+      clientId: r.clientId,
+      proposalId: r.proposalId,
+      createdAt: r.createdAt,
+    })));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Erro ao listar arquivos do cliente" });
@@ -60,11 +77,13 @@ router.get("/client/:clientId", async (req, res) => {
 });
 
 // DELETE /api/client-files/:id
-router.delete(":id", async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    // TODO: deletar arquivo da tabela `files`
-    return res.status(501).json({ error: "Not Implemented - delete file by id (pending migration)" });
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+    await db.delete(filesTable).where(eq(filesTable.id, id));
+    return res.status(204).send();
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Erro ao excluir arquivo" });
