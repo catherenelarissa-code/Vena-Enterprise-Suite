@@ -30,6 +30,8 @@ router.get("/", async (req, res) => {
         fonts: meta.fonts ?? null,
         logoFileId: meta.logoFileId ?? null,
         bannerFileId: meta.bannerFileId ?? null,
+        imageFileIds: meta.imageFileIds ?? [],
+        useGeneratedHtml: meta.useGeneratedHtml ?? false,
         isDefault: meta.isDefault ?? "false",
         createdAt: r.createdAt?.toISOString?.() ?? r.createdAt,
         updatedAt: r.updatedAt?.toISOString?.() ?? r.updatedAt,
@@ -45,12 +47,13 @@ router.get("/", async (req, res) => {
 // POST /api/proposal-templates
 router.post("/", async (req, res) => {
   try {
-    const { name, description, html, colors, fonts, logoFileId, bannerFileId, isDefault } = req.body;
-    if (!name || !html) return res.status(400).json({ error: "Nome e HTML são obrigatórios" });
+    const { name, description, html, colors, fonts, logoFileId, bannerFileId, imageFileIds, useGeneratedHtml, isDefault } = req.body;
+    if (!name) return res.status(400).json({ error: "Nome é obrigatório" });
+    if (!useGeneratedHtml && !html) return res.status(400).json({ error: "HTML é obrigatório quando não se usa gerarHTMLProposta" });
 
-    const label = JSON.stringify({ colors: colors ?? null, fonts: fonts ?? null, logoFileId: logoFileId ?? null, bannerFileId: bannerFileId ?? null, isDefault: isDefault ?? "false" });
+    const label = JSON.stringify({ colors: colors ?? null, fonts: fonts ?? null, logoFileId: logoFileId ?? null, bannerFileId: bannerFileId ?? null, imageFileIds: imageFileIds ?? [], useGeneratedHtml: !!useGeneratedHtml, isDefault: isDefault ?? "false" });
 
-    const [created] = await db.insert(messageTemplatesTable).values({ name, description: description ?? null, template: html, label }).returning();
+    const [created] = await db.insert(messageTemplatesTable).values({ name, description: description ?? null, template: useGeneratedHtml ? null : html, label }).returning();
 
     const meta = parseLabel((created as any).label);
 
@@ -63,6 +66,8 @@ router.post("/", async (req, res) => {
       fonts: meta.fonts ?? null,
       logoFileId: meta.logoFileId ?? null,
       bannerFileId: meta.bannerFileId ?? null,
+      imageFileIds: meta.imageFileIds ?? [],
+      useGeneratedHtml: meta.useGeneratedHtml ?? false,
       isDefault: meta.isDefault ?? "false",
       createdAt: (created as any).createdAt,
       updatedAt: (created as any).updatedAt,
@@ -77,11 +82,8 @@ router.post("/", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    const { name, description, html, colors, fonts, logoFileId, bannerFileId, imageFileIds, useGeneratedHtml, isDefault } = req.body;
 
-    const { name, description, html, colors, fonts, logoFileId, bannerFileId, isDefault } = req.body;
-
-    // Fetch existing to merge label
     const [existing] = await db.select().from(messageTemplatesTable).where(eq(messageTemplatesTable.id, id)).limit(1);
     if (!existing) return res.status(404).json({ error: "Template não encontrado" });
 
@@ -92,13 +94,20 @@ router.patch("/:id", async (req, res) => {
       ...(fonts !== undefined ? { fonts } : {}),
       ...(logoFileId !== undefined ? { logoFileId } : {}),
       ...(bannerFileId !== undefined ? { bannerFileId } : {}),
+      ...(imageFileIds !== undefined ? { imageFileIds } : {}),
+      ...(useGeneratedHtml !== undefined ? { useGeneratedHtml } : {}),
       ...(isDefault !== undefined ? { isDefault } : {}),
     };
 
     const updates: any = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
-    if (html !== undefined) updates.template = html;
+    // only set template if not using generated html
+    if (useGeneratedHtml === true) {
+      updates.template = null;
+    } else if (html !== undefined) {
+      updates.template = html;
+    }
     updates.label = JSON.stringify(newMeta);
 
     await db.update(messageTemplatesTable).set(updates).where(eq(messageTemplatesTable.id, id));
@@ -115,6 +124,8 @@ router.patch("/:id", async (req, res) => {
       fonts: meta.fonts ?? null,
       logoFileId: meta.logoFileId ?? null,
       bannerFileId: meta.bannerFileId ?? null,
+      imageFileIds: meta.imageFileIds ?? [],
+      useGeneratedHtml: meta.useGeneratedHtml ?? false,
       isDefault: meta.isDefault ?? "false",
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
@@ -129,8 +140,6 @@ router.patch("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-
     await db.delete(messageTemplatesTable).where(eq(messageTemplatesTable.id, id));
     return res.status(204).send();
   } catch (err) {
