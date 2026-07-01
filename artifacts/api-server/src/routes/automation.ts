@@ -8,6 +8,20 @@ const router = Router();
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
+interface GroqErrorResponse {
+  error?: {
+    message?: string;
+  };
+}
+
+interface GroqSuccessResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
 async function callGemini(prompt: string, imageBase64?: string, mediaType?: string): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error("GROQ_API_KEY não configurada");
@@ -37,11 +51,11 @@ async function callGemini(prompt: string, imageBase64?: string, mediaType?: stri
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = (await res.json().catch(() => ({}))) as GroqErrorResponse;
     throw new Error(err?.error?.message ?? `Groq error ${res.status}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as GroqSuccessResponse;
   return data.choices?.[0]?.message?.content ?? "";
 }
 
@@ -122,7 +136,7 @@ router.post("/ocr", async (req, res) => {
       ? `Tente extrair especialmente os seguintes campos: ${templateFields.join(", ")}.`
       : "";
 
-    const prompt = `Analise esta imagem e extraia todas as informações relevantes como: nome do cliente, CPF/CNPJ, valor, data, endereço, potência, unidade, número do pedido, forma de pagame[...]\n\nResponda APENAS com um JSON válido no formato...`;
+    const prompt = `Analise esta imagem e extraia todas as informações relevantes como: nome do cliente, CPF/CNPJ, valor, data, endereço, potência, unidade, número do pedido, forma de pagamento, etc.\n\n${fieldsHint}\n\nResponda APENAS com um JSON válido no formato { "campo": "valor", ... }`;
 
     const text = await callGemini(prompt, imageBase64, mediaType);
     return res.json(parseJson(text));
@@ -277,7 +291,7 @@ router.post("/propostas", async (req, res) => {
   }
 });
 
-// ── PATCH /api/automation/propostas/:id ───────────────────────────────────────
+// ── PATCH /api/automation/propostas/:id ───────────────────────���───────────────
 router.patch("/propostas/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
