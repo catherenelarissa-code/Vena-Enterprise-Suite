@@ -11,3 +11,4 @@ export * from "./message-templates";
 export * from "./crm";
 export * from "./agenda";
 export * from "./propostas-fv";
+export * from "./files";
