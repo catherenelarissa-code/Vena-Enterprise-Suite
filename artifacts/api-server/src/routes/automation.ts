@@ -243,8 +243,6 @@ async function handleGeneratePdf(req: any, res: any) {
 router.post("/generate-pdf", handleGeneratePdf);
 router.post("/pdf", handleGeneratePdf);
 
-import { prostasFVTable } from "@workspace/db";
-
 // ── GET /api/automation/propostas ─────────────────────────────────────────────
 router.get("/propostas", async (req, res) => {
   try {
