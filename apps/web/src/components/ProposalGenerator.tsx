@@ -60,12 +60,12 @@ export default function ProposalGenerator({ selectedTemplateId }: { selectedTemp
       }
 
       // Call generation endpoint that returns a PDF blob
-      const blob = await customFetch<Blob>('/api/automation/proposals/generate-pdf', {
+      const blob = (await customFetch('/api/automation/proposals/generate-pdf', {
         method: 'POST',
         responseType: 'blob',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      })
+      })) as Blob
 
       // Download locally
       const url = URL.createObjectURL(blob)
@@ -81,7 +81,8 @@ export default function ProposalGenerator({ selectedTemplateId }: { selectedTemp
       const fd = new FormData()
       fd.append('file', new File([blob], `proposal-${client.name}.pdf`, { type: 'application/pdf' }))
 
-      await fetch(`/api/clients/${client.id}/files`, { method: 'POST', body: fd, credentials: 'include' })
+      // use customFetch to upload the file (customFetch attaches credentials)
+      await customFetch(`/api/clients/${client.id}/files`, { method: 'POST', body: fd as any })
 
       alert('PDF gerado e salvo na área de arquivos do cliente')
     } catch (err) {
