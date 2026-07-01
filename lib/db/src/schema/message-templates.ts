@@ -4,7 +4,8 @@ export const messageTemplatesTable = pgTable("message_templates", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  template: text("template").notNull(),
+  // Allow null template when using generated HTML (metadata-only templates)
+  template: text("template"),
   label: text("label"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
