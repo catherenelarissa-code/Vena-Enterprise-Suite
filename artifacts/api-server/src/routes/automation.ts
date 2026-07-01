@@ -51,12 +51,12 @@ async function callGemini(prompt: string, imageBase64?: string, mediaType?: stri
   });
 
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as GroqErrorResponse;
-    throw new Error(err.error?.message ?? `Groq error ${res.status}`);
-  }
+  const err = (await res.json().catch(() => ({}))) as GroqErrorResponse;
+  throw new Error(err.error?.message ?? `Groq error ${res.status}`);
+}
 
-  const data = (await res.json()) as GroqSuccessResponse;
-  return data.choices?.[0]?.message?.content ?? "";
+const data = (await res.json()) as GroqSuccessResponse;
+return data.choices?.[0]?.message?.content ?? "";
 }
 
 function parseJson(text: string): any {
