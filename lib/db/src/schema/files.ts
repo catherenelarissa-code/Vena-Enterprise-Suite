@@ -1,10 +1,16 @@
-import { pgTable, serial, text, timestamp, integer, jsonb, blob } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, customType } from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 export const filesTable = pgTable("files", {
   id: serial("id").primaryKey(),
   filename: text("filename").notNull(),
   contentType: text("content_type").notNull(),
-  data: blob("data").$type<Buffer>().notNull(),
+  data: bytea("data").notNull(),
   clientId: integer("client_id"),
   proposalId: integer("proposal_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
