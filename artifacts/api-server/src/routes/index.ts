@@ -12,6 +12,8 @@ import priceMonitorRouter from "./price-monitor";
 import automationRouter from "./automation";
 import crmRouter from "./crm";
 import agendaRouter from "./agenda";
+import proposalTemplatesRouter from "./proposal-templates";
+import clientFilesRouter from "./client-files";
 
 const router: IRouter = Router();
 
@@ -27,6 +29,8 @@ router.use("/price-monitor", priceMonitorRouter);
 router.use("/automation", automationRouter);
 router.use("/crm", crmRouter);
 router.use("/agenda", agendaRouter);
+router.use("/proposal-templates", proposalTemplatesRouter);
+router.use("/client-files", clientFilesRouter);
 router.use("/stock-movements", stockMovementsRouter);
 
 export default router;
