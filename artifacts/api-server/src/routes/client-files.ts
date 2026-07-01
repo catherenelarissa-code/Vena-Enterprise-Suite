@@ -12,17 +12,23 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const file = req.file;
     const clientId = req.body.clientId ? parseInt(req.body.clientId) : null;
     const proposalId = req.body.proposalId ? parseInt(req.body.proposalId) : null;
-
     if (!file) return res.status(400).json({ error: "Arquivo é obrigatório" });
 
-   const [created] = await db.insert(filesTable).values({
-  filename: fileName ?? `proposta-${Date.now()}.pdf`,
-  contentType: "application/pdf",
-  data: Buffer.from(pdfBuffer),
-  clientId: clientId ?? null,
-  proposalId: proposalId ?? null,
-}).returning();
+    const [created] = await db.insert(filesTable).values({
+      filename: file.originalname,
+      contentType: file.mimetype,
+      data: file.buffer,
+      clientId: clientId ?? null,
+      proposalId: proposalId ?? null,
+    }).returning();
 
+    return res.status(201).json({
+      id: created.id,
+      filename: created.filename,
+      contentType: created.contentType,
+      clientId: created.clientId,
+      proposalId: created.proposalId,
+      createdAt: created.createdAt,
     });
   } catch (err) {
     console.error(err);
@@ -35,10 +41,8 @@ router.get("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-
     const [row] = await db.select().from(filesTable).where(eq(filesTable.id, id));
     if (!row) return res.status(404).json({ error: "Arquivo não encontrado" });
-
     res.setHeader("Content-Type", row.contentType || "application/octet-stream");
     res.setHeader("Content-Disposition", `attachment; filename="${row.filename}"`);
     return res.send(row.data as Buffer);
@@ -53,7 +57,6 @@ router.get("/client/:clientId", async (req, res) => {
   try {
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ error: "clientId inválido" });
-
     const rows = await db.select().from(filesTable).where(eq(filesTable.clientId, clientId)).orderBy(filesTable.createdAt);
     return res.json(rows.map(r => ({
       id: r.id,
@@ -74,7 +77,6 @@ router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-
     await db.delete(filesTable).where(eq(filesTable.id, id));
     return res.status(204).send();
   } catch (err) {
