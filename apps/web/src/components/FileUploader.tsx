@@ -13,11 +13,14 @@ export default function FileUploader({ onUploaded }: { onUploaded: (url: string)
       const fd = new FormData()
       fd.append('file', file)
 
-      // send to generic upload endpoint - server should return { url }
-      const resp = await fetch('/api/uploads', { method: 'POST', body: fd, credentials: 'include' })
-      if (!resp.ok) throw new Error('upload failed')
-      const data = await resp.json()
-      const url = data.url || data.path || ''
+      // use customFetch which attaches credentials and infers response type
+      const data = await customFetch<{ url?: string; path?: string }>('/api/uploads', {
+        method: 'POST',
+        body: fd as any,
+        responseType: 'auto',
+      } as any)
+
+      const url = (data && (data.url || data.path)) || ''
       if (url) onUploaded(url)
     } catch (err) {
       console.error('upload error', err)
