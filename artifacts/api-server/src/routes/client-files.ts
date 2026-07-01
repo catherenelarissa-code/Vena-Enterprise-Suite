@@ -15,21 +15,14 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     if (!file) return res.status(400).json({ error: "Arquivo é obrigatório" });
 
-    const [created] = await db.insert(filesTable).values({
-      filename: file.originalname,
-      contentType: file.mimetype,
-      data: file.buffer,
-      clientId: clientId ?? null,
-      proposalId: proposalId ?? null,
-    } as any).returning();
+   const [created] = await db.insert(filesTable).values({
+  filename: fileName ?? `proposta-${Date.now()}.pdf`,
+  contentType: "application/pdf",
+  data: Buffer.from(pdfBuffer),
+  clientId: clientId ?? null,
+  proposalId: proposalId ?? null,
+}).returning();
 
-    return res.status(201).json({
-      id: (created as any).id,
-      filename: (created as any).filename,
-      contentType: (created as any).contentType,
-      clientId: (created as any).clientId,
-      proposalId: (created as any).proposalId,
-      createdAt: (created as any).createdAt,
     });
   } catch (err) {
     console.error(err);
