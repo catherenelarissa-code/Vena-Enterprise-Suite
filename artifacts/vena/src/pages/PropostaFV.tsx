@@ -1,14 +1,15 @@
 import { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Trash2, FileText, Download, Eye } from "lucide-react";
+import { Plus, Trash2, FileText, Download, Eye, File, Loader2 } from "lucide-react";
 import { gerarHTMLProposta } from "./propostaTemplate";
 
-// ── Tipos ─────────────────────────────────────────────────────────────────────
+// ── Tipos ────────────────────────────────────────────────────────────[...]
 
 type PagamentoLinha = { forma: string; qtd: string; valor: string };
 
@@ -23,6 +24,15 @@ type FormData = {
   valorAVista: string; valorExtenso: string;
 };
 
+type ClientFile = {
+  id: number;
+  filename: string;
+  contentType: string;
+  clientId: number | null;
+  proposalId: number | null;
+  createdAt: string;
+};
+
 const FORM_INICIAL: FormData = {
   nomeCliente: "", cpfCnpj: "", cidade: "", estado: "", data: "",
   kwp: "", areaM2: "", kwhMes: "",
@@ -31,7 +41,7 @@ const FORM_INICIAL: FormData = {
   valorAVista: "", valorExtenso: "",
 };
 
-// ── Helper API ────────────────────────────────────────────────────────────────
+// ── Helper API ──────────────────────────────────────────────────────────
 
 async function apiCall(path: string, options?: RequestInit) {
   const res = await fetch(`/api/automation${path}`, {
@@ -54,7 +64,7 @@ function formatarData(iso: string) {
   return `${parseInt(d)} de ${meses[parseInt(m) - 1]} de ${y}`;
 }
 
-// ── Componente ────────────────────────────────────────────────────────────────
+// ── Componente ──────────────────────────────────────────────────────────
 
 export function PropostaFV() {
   const [form, setForm]         = useState<FormData>(FORM_INICIAL);
@@ -64,9 +74,22 @@ export function PropostaFV() {
   const [formas, setFormas]     = useState({ avista: true, financiamento: false, parcelado: false });
   const [preview, setPreview]   = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [aba, setAba]           = useState<"form" | "preview">("form");
+  const [aba, setAba]           = useState<"form" | "preview" | "arquivos">("form");
+  const [gerandoPDF, setGerandoPDF] = useState(false);
+  const queryClient = useQueryClient();
 
-  // ── Campo genérico ──────────────────────────────────────────────────────────
+  // ── Fetch client files ────────────────────────────────────────────────────────
+
+  const { data: clientFiles = [], isLoading: filesLoading, refetch: refetchFiles } = useQuery({
+    queryKey: ["client-files"],
+    queryFn: async () => {
+      const res = await fetch("/api/client-files/client/0");
+      if (!res.ok) return [];
+      return res.json() as Promise<ClientFile[]>;
+    },
+  });
+
+  // ── Campo genérico ────────────────────────────────────────────────────────
 
   function campo(id: keyof FormData, label: string, placeholder = "") {
     return (
@@ -95,7 +118,7 @@ export function PropostaFV() {
     setPagamento((p) => p.filter((_, i) => i !== idx));
   }
 
-  // ── Gerar proposta ──────────────────────────────────────────────────────────
+  // ── Gerar proposta ────────────────────────────────────────────────────────
 
   const gerar = useCallback(() => {
     if (!form.nomeCliente) {
@@ -117,7 +140,7 @@ export function PropostaFV() {
     return html;
   }, [form, pagamento, formas]);
 
-  // ── Salvar no banco ─────────────────────────────────────────────────────────
+  // ── Salvar no banco ───────────────────────────────────────────────────────
 
   async function salvar() {
     if (!form.nomeCliente) { toast.error("Nome do cliente é obrigatório."); return; }
@@ -128,6 +151,7 @@ export function PropostaFV() {
         body: JSON.stringify({ ...form, pagamento }),
       });
       toast.success("Proposta salva com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["client-files"] });
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -135,17 +159,74 @@ export function PropostaFV() {
     }
   }
 
-  // ── PDF ─────────────────────────────────────────────────────────────────────
+  // ── PDF ───────────────────────────────────────────────────────────
 
-  function abrirPDF() {
+  async function abrirPDF() {
     const html = gerar();
     if (!html) return;
-    const printCss = `<style>@media print{@page{margin:0;size:A4}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>`;
-    const blob = new Blob([html.replace("</head>", printCss + "</head>")], { type: "text/html" });
-    window.open(URL.createObjectURL(blob), "_blank");
+    
+    setGerandoPDF(true);
+    try {
+      const res = await fetch("/api/automation/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          html,
+          clientId: null,
+          proposalId: null,
+          fileName: `proposta-${form.nomeCliente}-${new Date().toISOString().split('T')[0]}.pdf`,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Erro ao gerar PDF");
+
+      // Download the PDF
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `proposta-${form.nomeCliente}-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Invalidate queries to refresh file list
+      queryClient.invalidateQueries({ queryKey: ["client-files"] });
+      await refetchFiles();
+
+      toast.success("PDF gerado e salvo com sucesso!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao gerar PDF");
+    } finally {
+      setGerandoPDF(false);
+    }
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Download/Visualizar arquivo ────────────────────────────────────────────
+
+  function downloadFile(fileId: number, filename: string) {
+    const url = `/api/client-files/${fileId}`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  function viewFile(fileId: number, contentType: string) {
+    if (contentType.includes("pdf")) {
+      window.open(`/api/client-files/${fileId}`, "_blank");
+    } else if (contentType.includes("image")) {
+      window.open(`/api/client-files/${fileId}`, "_blank");
+    } else {
+      downloadFile(fileId, `arquivo-${fileId}`);
+    }
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -160,8 +241,16 @@ export function PropostaFV() {
           <Button variant="outline" onClick={() => { gerar(); setAba("preview"); }}>
             <Eye className="mr-2 h-4 w-4" /> Pré-visualizar
           </Button>
-          <Button variant="outline" onClick={abrirPDF}>
-            <Download className="mr-2 h-4 w-4" /> Gerar PDF
+          <Button variant="outline" onClick={abrirPDF} disabled={gerandoPDF}>
+            {gerandoPDF ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" /> Gerar PDF
+              </>
+            )}
           </Button>
           <Button onClick={salvar} disabled={salvando}>
             <FileText className="mr-2 h-4 w-4" />
@@ -172,7 +261,7 @@ export function PropostaFV() {
 
       {/* Abas internas */}
       <div className="flex gap-1 border-b">
-        {(["form", "preview"] as const).map((t) => (
+        {(["form", "preview", "arquivos"] as const).map((t) => (
           <button
             key={t}
             onClick={() => { if (t === "preview") gerar(); setAba(t); }}
@@ -180,7 +269,7 @@ export function PropostaFV() {
               aba === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            {t === "form" ? "📋 Dados" : "👁 Preview"}
+            {t === "form" ? "📋 Dados" : t === "preview" ? "👁 Preview" : "📁 Arquivos"}
           </button>
         ))}
       </div>
@@ -336,6 +425,71 @@ export function PropostaFV() {
               Preencha os dados e clique em Pré-visualizar.
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── ABA ARQUIVOS ── */}
+      {aba === "arquivos" && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <File className="h-4 w-4" />
+                Arquivos Gerados
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {filesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Carregando arquivos...
+                </div>
+              ) : clientFiles.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Nenhum arquivo gerado ainda.</p>
+                  <p className="text-sm mt-2">Gere um PDF para ver os arquivos aqui.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {clientFiles.map((file) => (
+                    <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <File className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{file.filename}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(file.createdAt).toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => viewFile(file.id, file.contentType)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => downloadFile(file.id, file.filename)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 
