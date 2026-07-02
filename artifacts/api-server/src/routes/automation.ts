@@ -146,7 +146,78 @@ router.post("/ocr", async (req, res) => {
   }
 });
 
-// ... other OCR endpoints unchanged ...
+// POST /api/automation/ocr-quote - OCR para cotações
+router.post("/ocr-quote", async (req, res) => {
+  try {
+    const { imageBase64, mediaType, itemNames } = req.body;
+    if (!imageBase64 || !mediaType) return res.status(400).json({ error: "Imagem é obrigatória" });
+    const itemsHint = itemNames?.length
+      ? `Os itens da solicitação são: ${itemNames.join(", ")}. Tente encontrar o preço unitário de cada um.`
+      : "Extraia todos os itens e preços que encontrar.";
+    const prompt = `Você está analisando um orçamento ou cotação de fornecedor. ${itemsHint}
+Extraia: nome do fornecedor, prazo de entrega em dias, valor do frete, preço unitário de cada item, observações.
+Responda APENAS com JSON:
+{
+  "supplierName": "nome ou null",
+  "deliveryDays": "número ou null",
+  "freightCost": "valor numérico ou null",
+  "notes": "observações ou null",
+  "prices": { "nome do item": "preço unitário numérico" }
+}
+Não inclua R$, unidades ou texto nos valores numéricos. Não inclua markdown.`;
+    const text = await callGemini(prompt, imageBase64, mediaType);
+    return res.json(parseJson(text));
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ error: err.message ?? "Erro ao processar orçamento" });
+  }
+});
+
+// POST /api/automation/ocr-materials - OCR para lista de materiais
+router.post("/ocr-materials", async (req, res) => {
+  try {
+    const { base64, mediaType } = req.body;
+    if (!base64 || !mediaType) return res.status(400).json({ error: "Imagem é obrigatória" });
+    const prompt = `Você está analisando um documento com itens de compra (lista de materiais, orçamento, nota fiscal).
+Extraia TODOS os itens com suas quantidades e unidades. Use apenas estas unidades: un, m, m², kg, cx, rolo, pç, lt. Se não souber a unidade use "un". Se não souber a quantidade use "1".
+Responda APENAS com JSON:
+{
+  "items": [
+    { "materialName": "nome do material", "quantity": "número", "unit": "unidade", "notes": "" }
+  ]
+}
+Não inclua markdown. Se não encontrar itens retorne { "items": [] }.`;
+    const text = await callGemini(prompt, base64, mediaType);
+    return res.json(parseJson(text));
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ error: err.message ?? "Erro ao processar materiais" });
+  }
+});
+
+// POST /api/automation/ocr-expense - OCR para despesas operacionais
+router.post("/ocr-expense", async (req, res) => {
+  try {
+    const { base64, mediaType } = req.body;
+    if (!base64 || !mediaType) return res.status(400).json({ error: "Imagem é obrigatória" });
+    const prompt = `Você está analisando um cupom fiscal, nota fiscal ou romaneio de uma despesa operacional.
+Extraia: nome do fornecedor/estabelecimento, uma descrição resumida dos itens comprados (junte os principais itens em uma frase curta), o valor total da compra, e o método de pagamento se constar no documento (ex: pix, cartão de crédito, cartão de débito, dinheiro, boleto).
+Responda APENAS com JSON:
+{
+  "supplierName": "nome ou null",
+  "description": "descrição resumida dos itens ou null",
+  "amount": "valor numérico total ou null",
+  "paymentMethod": "pix | cartao_credito | cartao_debito | dinheiro | boleto | null",
+  "rawText": "texto bruto relevante lido do documento, resumido"
+}
+Não inclua R$, unidades ou texto nos valores numéricos. Não inclua markdown.`;
+    const text = await callGemini(prompt, base64, mediaType);
+    return res.json(parseJson(text));
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ error: err.message ?? "Erro ao processar despesa" });
+  }
+});
 
 // POST /api/automation/render-template
 router.post("/render-template", async (req, res) => {
