@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ClientSearchInput } from "@/components/SearchInputs";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -69,6 +70,7 @@ type ProjectForm = {
   name: string;
   costCenter: string;
   client: string;
+  clientId?: number | null;
   type: string;
   description: string;
   budget: string;
@@ -84,24 +86,20 @@ function ProjectModal({
   editing,
   onClose,
   onSaved,
-  clients,
 }: {
   editing: any | null;
   onClose: () => void;
   onSaved: () => void;
-  clients: any[];
 }) {
   const queryClient = useQueryClient();
   const { mutateAsync: createProject, isPending: isCreating } = useCreateProject();
   const { mutateAsync: updateProject, isPending: isUpdating } = useUpdateProject();
 
   const [form, setForm] = useState<ProjectForm>({
-    client: editing?.client ?? "",
-    clientId: editing?.clientId ?? null,
-});
     name: editing?.name ?? "",
     costCenter: editing?.costCenter ?? "",
     client: editing?.client ?? "",
+    clientId: editing?.clientId ?? null,
     type: editing?.type ?? "fotovoltaica",
     description: editing?.description ?? "",
     budget: editing?.budget?.toString() ?? "",
@@ -415,17 +413,8 @@ export function Obras() {
   const [filterStatus, setFilterStatus] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState<any | null>(null);
-  const [clients, setClients] = useState<any[]>([]);
 
   const { data: projects, isLoading } = useListProjects({}, { query: { queryKey: getListProjectsQueryKey() } });
-
-  // Carrega clientes do CRM
-  useState(() => {
-    fetch("/api/crm/clients", { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(setClients)
-      .catch(() => {});
-  });
 
   const filtered = projects?.filter(p => {
     const matchSearch = !search ||
@@ -557,7 +546,6 @@ export function Obras() {
           editing={editingProject}
           onClose={() => { setShowModal(false); setEditingProject(null); }}
           onSaved={() => {}}
-          clients={clients}
         />
       )}
     </div>
