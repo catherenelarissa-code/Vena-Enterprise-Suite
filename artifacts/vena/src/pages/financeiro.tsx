@@ -93,7 +93,6 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
   const { mutateAsync: createAccount, isPending: isCreating } = useCreateFinancialAccount();
   const { mutateAsync: updateAccount, isPending: isUpdating } = useUpdateFinancialAccount();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [clients, setClients] = useState<Client[]>([]);
 
   const [form, setForm] = useState({
     type: editing?.type ?? defaultType,
@@ -104,7 +103,6 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
     supplierId: editing?.supplierId?.toString() ?? "",
     clientId: editing?.clientId?.toString() ?? "",
     clientName: editing?.clientName ?? "",
-});
     paymentMethod: editing?.paymentMethod ?? "",
     attachmentUrl: editing?.attachmentUrl ?? "",
     notes: editing?.notes ?? "",
@@ -112,11 +110,6 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
   const [newCategory, setNewCategory] = useState("");
   const [showNewCat, setShowNewCat] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
-
-  useEffect(() => {
-    fetch(`${API}/api/crm/clients`, { credentials: "include" })
-      .then(r => r.json()).then(setClients).catch(() => {});
-  }, []);
 
   const isPending = isCreating || isUpdating;
   const cats = form.type === "receivable" ? categories.income : categories.expense;
@@ -257,21 +250,13 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
           {form.type === "receivable" && (
             <div className="space-y-1.5">
               <Label className="text-white/60 text-xs flex items-center gap-1"><User className="h-3.5 w-3.5" /> Cliente</Label>
-              {form.type === "receivable" && (
-  <ClientSearchInput
-    value={form.clientName}
-    selectedId={form.clientId ? parseInt(form.clientId) : null}
-    onChange={(id, name) =>
-      setForm(f => ({ ...f, clientId: id?.toString() ?? "", clientName: name }))
-    }
-  />
-)}}>
-                <SelectTrigger className="border-white/10 bg-white/5 text-white"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
-                <SelectContent style={{ background: "hsl(220,25%,13%)" }}>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {clients.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <ClientSearchInput
+                value={form.clientName}
+                selectedId={form.clientId ? parseInt(form.clientId) : null}
+                onChange={(id, name) =>
+                  setForm(f => ({ ...f, clientId: id?.toString() ?? "", clientName: name }))
+                }
+              />
               <p className="text-[11px] text-white/30 mt-1">Os pagamentos vinculados a este cliente aparecerão no histórico dele.</p>
             </div>
           )}
