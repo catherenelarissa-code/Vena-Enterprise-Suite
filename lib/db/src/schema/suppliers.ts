@@ -1,5 +1,5 @@
 import { pgTable, serial, text, timestamp, numeric, integer } from "drizzle-orm/pg-core";
-imort { createInsertSchema } from "drizzle-zod";
+import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const suppliersTable = pgTable("suppliers", {
