@@ -1,3 +1,4 @@
+import { ClientSearchInput } from "@/components/SearchInputs";
 import { useState, useRef, useEffect } from "react";
 import {
   useListFinancialAccounts, getListFinancialAccountsQueryKey,
@@ -102,6 +103,8 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
     category: editing?.category ?? "",
     supplierId: editing?.supplierId?.toString() ?? "",
     clientId: editing?.clientId?.toString() ?? "",
+    clientName: editing?.clientName ?? "",
+});
     paymentMethod: editing?.paymentMethod ?? "",
     attachmentUrl: editing?.attachmentUrl ?? "",
     notes: editing?.notes ?? "",
@@ -254,7 +257,15 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
           {form.type === "receivable" && (
             <div className="space-y-1.5">
               <Label className="text-white/60 text-xs flex items-center gap-1"><User className="h-3.5 w-3.5" /> Cliente</Label>
-              <Select value={form.clientId} onValueChange={v => setForm(f => ({ ...f, clientId: v }))}>
+              {form.type === "receivable" && (
+  <ClientSearchInput
+    value={form.clientName}
+    selectedId={form.clientId ? parseInt(form.clientId) : null}
+    onChange={(id, name) =>
+      setForm(f => ({ ...f, clientId: id?.toString() ?? "", clientName: name }))
+    }
+  />
+)}}>
                 <SelectTrigger className="border-white/10 bg-white/5 text-white"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
                 <SelectContent style={{ background: "hsl(220,25%,13%)" }}>
                   <SelectItem value="none">Nenhum</SelectItem>
