@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import {
   Plus, ArrowDownRight, ArrowUpRight, Wallet, CheckCircle,
   Trash2, Pencil, Download, Paperclip, Tag, User, X, TrendingDown, BarChart3,
+  KeyRound, Copy,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DespesasOperacionais } from "./DespesasOperacionais";
@@ -113,6 +114,9 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
 
   const isPending = isCreating || isUpdating;
   const cats = form.type === "receivable" ? categories.income : categories.expense;
+  const selectedSupplier = form.supplierId && form.supplierId !== "none"
+    ? suppliers.find((s: any) => s.id.toString() === form.supplierId)
+    : null;
 
   async function handleFile(file: File) {
     setUploadingFile(true);
@@ -244,6 +248,35 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
                   {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {selectedSupplier?.pixKey && (
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3 flex items-center justify-between gap-2 mt-1">
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-white/40 flex items-center gap-1">
+                      <KeyRound className="h-3 w-3" /> Chave Pix do fornecedor
+                    </p>
+                    <p className="text-sm text-white truncate">{selectedSupplier.pixKey}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {form.paymentMethod !== "pix" && (
+                      <Button
+                        type="button" size="sm" variant="outline"
+                        className="border-white/10 text-white/60 text-xs h-8"
+                        onClick={() => setForm(f => ({ ...f, paymentMethod: "pix" }))}
+                      >
+                        Usar Pix
+                      </Button>
+                    )}
+                    <Button
+                      type="button" size="icon" variant="outline"
+                      className="border-white/10 text-white/60 h-8 w-8"
+                      onClick={() => { navigator.clipboard.writeText(selectedSupplier.pixKey); toast.success("Chave Pix copiada!"); }}
+                      title="Copiar chave Pix"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
