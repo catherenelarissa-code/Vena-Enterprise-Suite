@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useListSuppliers, getListSuppliersQueryKey, useCreateSupplier } from "@workspace/api-client-react";
+import {
+  useListSuppliers, getListSuppliersQueryKey,
+  useCreateSupplier, useUpdateSupplier, useDeleteSupplier,
+} from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,14 +11,55 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Filter, Star, Phone, Mail, MapPin } from "lucide-react";
+import {
+  Search, Plus, Filter, Star, Phone, Mail, MapPin,
+  Pencil, Trash2, KeyRound, Copy,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
-function StarRating({ rating }: { rating: number }) {
+type Supplier = {
+  id: number;
+  name: string;
+  category: string;
+  contact: string;
+  email?: string;
+  phone?: string;
+  cnpj?: string;
+  address?: string;
+  notes?: string;
+  pixKey?: string;
+  avgPriceScore?: number;
+  avgDeliveryScore?: number;
+  avgQualityScore?: number;
+};
+
+function StarRating({
+  rating,
+  onChange,
+  editable = false,
+}: {
+  rating: number;
+  onChange?: (value: number) => void;
+  editable?: boolean;
+}) {
   return (
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((star) => (
-        <Star key={star} className={`h-3.5 w-3.5 ${star <= Math.round(rating) ? 'fill-accent text-accent' : 'fill-muted text-muted'}`} />
+        <button
+          key={star}
+          type="button"
+          disabled={!editable}
+          onClick={() => onChange?.(star)}
+          className={editable ? "cursor-pointer" : "cursor-default"}
+          aria-label={editable ? `Avaliar com ${star} estrela(s)` : undefined}
+        >
+          <Star
+            className={`h-3.5 w-3.5 transition-transform ${
+              star <= Math.round(rating) ? "fill-accent text-accent" : "fill-muted text-muted"
+            } ${editable ? "hover:scale-110" : ""}`}
+          />
+        </button>
       ))}
       <span className="ml-1.5 text-xs font-medium">{Number(rating || 0).toFixed(1)}</span>
     </div>
@@ -25,6 +69,8 @@ function StarRating({ rating }: { rating: number }) {
 export function Fornecedores() {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [contact, setContact] = useState("");
@@ -32,29 +78,115 @@ export function Fornecedores() {
   const [phone, setPhone] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [address, setAddress] = useState("");
+  const [pixKey, setPixKey] = useState("");
   const [notes, setNotes] = useState("");
+  const [priceScore, setPriceScore] = useState(0);
+  const [deliveryScore, setDeliveryScore] = useState(0);
+  const [qualityScore, setQualityScore] = useState(0);
 
   const queryClient = useQueryClient();
   const { data: suppliers, isLoading } = useListSuppliers({}, { query: { queryKey: getListSuppliersQueryKey() } });
-  const { mutate: createSupplier, isPending } = useCreateSupplier();
+  const { mutate: createSupplier, isPending: isCreating } = useCreateSupplier();
+  const { mutate: updateSupplier, isPending: isUpdating } = useUpdateSupplier();
+  const { mutate: deleteSupplier } = useDeleteSupplier();
 
-  const filteredSuppliers = suppliers?.filter(s =>
+  const isPending = isCreating || isUpdating;
+
+  const filteredSuppliers = suppliers?.filter((s: Supplier) =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.category.toLowerCase().includes(search.toLowerCase())
   );
 
+  function resetForm() {
+    setName(""); setCategory(""); setContact(""); setEmail("");
+    setPhone(""); setCnpj(""); setAddress(""); setPixKey(""); setNotes("");
+    setPriceScore(0); setDeliveryScore(0); setQualityScore(0);
+  }
+
+  function openCreateModal() {
+    setEditingSupplier(null);
+    resetForm();
+    setShowModal(true);
+  }
+
+  function openEditModal(supplier: Supplier) {
+    setEditingSupplier(supplier);
+    setName(supplier.name ?? "");
+    setCategory(supplier.category ?? "");
+    setContact(supplier.contact ?? "");
+    setEmail(supplier.email ?? "");
+    setPhone(supplier.phone ?? "");
+    setCnpj(supplier.cnpj ?? "");
+    setAddress(supplier.address ?? "");
+    setPixKey(supplier.pixKey ?? "");
+    setNotes(supplier.notes ?? "");
+    setPriceScore(supplier.avgPriceScore ?? 0);
+    setDeliveryScore(supplier.avgDeliveryScore ?? 0);
+    setQualityScore(supplier.avgQualityScore ?? 0);
+    setShowModal(true);
+  }
+
+  function closeModal() {
+    setShowModal(false);
+    setEditingSupplier(null);
+  }
+
   function handleSubmit() {
     if (!name || !category || !contact) return;
-    createSupplier({
-      data: { name, category, contact, email, phone, cnpj, address, notes }
-    }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListSuppliersQueryKey() });
-        setShowModal(false);
-        setName(""); setCategory(""); setContact(""); setEmail("");
-        setPhone(""); setCnpj(""); setAddress(""); setNotes("");
+    const payload = {
+      name, category, contact, email, phone, cnpj, address, notes,
+      pixKey,
+      avgPriceScore: priceScore,
+      avgDeliveryScore: deliveryScore,
+      avgQualityScore: qualityScore,
+    };
+
+    if (editingSupplier) {
+      updateSupplier(
+        { id: editingSupplier.id, data: payload },
+        {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: getListSuppliersQueryKey() });
+            toast.success("Fornecedor atualizado!");
+            closeModal();
+            resetForm();
+          },
+          onError: () => toast.error("Erro ao atualizar fornecedor."),
+        }
+      );
+    } else {
+      createSupplier(
+        { data: payload },
+        {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: getListSuppliersQueryKey() });
+            toast.success("Fornecedor cadastrado!");
+            closeModal();
+            resetForm();
+          },
+          onError: () => toast.error("Erro ao cadastrar fornecedor."),
+        }
+      );
+    }
+  }
+
+  function handleDelete(supplier: Supplier) {
+    if (!window.confirm(`Excluir o fornecedor "${supplier.name}"? Essa ação não pode ser desfeita.`)) return;
+    deleteSupplier(
+      { id: supplier.id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListSuppliersQueryKey() });
+          toast.success("Fornecedor excluído.");
+        },
+        onError: () => toast.error("Erro ao excluir fornecedor."),
       }
-    });
+    );
+  }
+
+  function copyPixKey(key: string) {
+    navigator.clipboard.writeText(key);
+    toast.success("Chave Pix copiada!");
   }
 
   return (
@@ -64,7 +196,7 @@ export function Fornecedores() {
           <h2 className="text-3xl font-bold tracking-tight">Fornecedores</h2>
           <p className="text-muted-foreground">Base de parceiros comerciais e avaliações de desempenho.</p>
         </div>
-        <Button onClick={() => setShowModal(true)} className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button onClick={openCreateModal} className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90">
           <Plus className="mr-2 h-4 w-4" /> Novo Fornecedor
         </Button>
       </div>
@@ -83,14 +215,30 @@ export function Fornecedores() {
         {isLoading ? (
           Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-64 rounded-xl" />)
         ) : filteredSuppliers && filteredSuppliers.length > 0 ? (
-          filteredSuppliers.map((supplier) => (
-            <Card key={supplier.id} className="overflow-hidden hover:border-primary/50 transition-colors flex flex-col">
+          filteredSuppliers.map((supplier: Supplier) => (
+            <Card key={supplier.id} className="overflow-hidden hover:border-primary/50 transition-colors flex flex-col group">
               <div className="p-5 border-b bg-muted/20">
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex justify-between items-start mb-2 gap-2">
                   <h3 className="font-bold text-lg truncate pr-2">{supplier.name}</h3>
-                  <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 shrink-0">
-                    {supplier.category}
-                  </Badge>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                      {supplier.category}
+                    </Badge>
+                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={() => openEditModal(supplier)} title="Editar fornecedor"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                        onClick={() => handleDelete(supplier)} title="Excluir fornecedor"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
                 {supplier.cnpj && <p className="text-xs text-muted-foreground font-mono">CNPJ: {supplier.cnpj}</p>}
               </div>
@@ -108,6 +256,19 @@ export function Fornecedores() {
                     <MapPin className="mr-2 h-4 w-4 text-primary/70 shrink-0" />
                     <span className="truncate">{supplier.address || 'Não informado'}</span>
                   </div>
+                  {supplier.pixKey && (
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <KeyRound className="mr-2 h-4 w-4 text-primary/70 shrink-0" />
+                      <span className="truncate flex-1">{supplier.pixKey}</span>
+                      <button
+                        onClick={() => copyPixKey(supplier.pixKey!)}
+                        className="text-primary/70 hover:text-primary shrink-0 ml-1"
+                        title="Copiar chave Pix"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-6 pt-4 border-t space-y-2">
                   <div className="flex justify-between items-center">
@@ -133,10 +294,10 @@ export function Fornecedores() {
         )}
       </div>
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => !open && closeModal()}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Fornecedor</DialogTitle>
+            <DialogTitle>{editingSupplier ? "Editar Fornecedor" : "Novo Fornecedor"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -174,14 +335,44 @@ export function Fornecedores() {
               </div>
             </div>
             <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <KeyRound className="h-3.5 w-3.5" /> Chave Pix
+              </Label>
+              <Input
+                placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória"
+                value={pixKey}
+                onChange={e => setPixKey(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Usada para preencher o pagamento automaticamente na aba Financeiro &gt; A Pagar.
+              </p>
+            </div>
+
+            <div className="space-y-2 rounded-lg border p-3">
+              <Label className="text-xs text-muted-foreground">Avaliação</Label>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Preço</span>
+                <StarRating rating={priceScore} editable onChange={setPriceScore} />
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Entrega</span>
+                <StarRating rating={deliveryScore} editable onChange={setDeliveryScore} />
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Qualidade</span>
+                <StarRating rating={qualityScore} editable onChange={setQualityScore} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label>Observações</Label>
               <Textarea placeholder="Produtos principais, condições de pagamento..." value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={closeModal}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={isPending}>
-              {isPending ? "Salvando..." : "Cadastrar Fornecedor"}
+              {isPending ? "Salvando..." : editingSupplier ? "Salvar Alterações" : "Cadastrar Fornecedor"}
             </Button>
           </DialogFooter>
         </DialogContent>
