@@ -599,7 +599,7 @@ function renderFooter(layout: LayoutConfig): string {
 
 // ── Registro de seções configuráveis ────────────────────────────────────────
 
-const SECAO_RENDERERS: Record
+const SECAO_RENDERERS: Record<
   SecaoId,
   (d: DadosProposta, layout: LayoutConfig) => string
 > = {
