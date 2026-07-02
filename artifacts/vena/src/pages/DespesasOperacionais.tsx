@@ -1,5 +1,7 @@
 import { useState, useRef } from "react";
 import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker?url";
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
