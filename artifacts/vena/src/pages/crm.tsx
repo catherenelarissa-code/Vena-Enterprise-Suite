@@ -13,9 +13,16 @@ setBaseUrl(import.meta.env.VITE_API_URL ?? "");
 
 type Column = { id: number; name: string; color: string; position: number };
 type Client = {
-  id: number; name: string; phone?: string; email?: string;
+  id: number; name: string; phone?: string; celular?: string; email?: string;
   cpf_cnpj?: string; address?: string; origin?: string; notes?: string;
   column_id: number; position: number; column_name?: string; column_color?: string;
+  // campos extras importados
+  rg?: string; orgao_expedidor?: string; data_nascimento?: string; uc?: string;
+  nacionalidade?: string; cnh?: string; estado_civil?: string; nome_mae?: string;
+  razao_social?: string; nome_fantasia?: string; enquadramento?: string;
+  inscricao_municipal?: string; inscricao_estadual?: string;
+  data_abertura_empresa?: string; cnae?: string; faturamento_12m?: string;
+  tipo_projeto?: string;
 };
 type HistoryEntry = { id: number; type: string; description: string; created_at: string; user_name?: string };
 
@@ -40,6 +47,18 @@ async function apiFetch(path: string, options?: RequestInit) {
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+function InfoRow({ icon, label, value, span }: { icon: React.ReactNode; label: string; value: string; span?: boolean }) {
+  return (
+    <div className={`flex items-start gap-2 p-2 rounded-lg border border-white/5 bg-white/5 ${span ? "col-span-2" : ""}`}>
+      <div className="mt-0.5">{icon}</div>
+      <div className="min-w-0">
+        <p className="text-[10px] text-white/30">{label}</p>
+        <p className="text-xs text-white/70 break-words">{value}</p>
+      </div>
+    </div>
+  );
 }
 
 export function CRM() {
@@ -94,7 +113,13 @@ export function CRM() {
 
   // Forms
   const [clientForm, setClientForm] = useState({ name: "", phone: "", email: "", cpf_cnpj: "", address: "", origin: "", notes: "", column_id: 0 });
-  const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", cpf_cnpj: "", address: "", origin: "", notes: "" });
+  const [editForm, setEditForm] = useState({
+    name: "", phone: "", celular: "", email: "", cpf_cnpj: "", address: "", origin: "", notes: "",
+    rg: "", orgao_expedidor: "", data_nascimento: "", uc: "", nacionalidade: "",
+    cnh: "", estado_civil: "", nome_mae: "", razao_social: "", nome_fantasia: "",
+    enquadramento: "", inscricao_municipal: "", inscricao_estadual: "",
+    data_abertura_empresa: "", cnae: "", faturamento_12m: "", tipo_projeto: "",
+  });
   const [columnForm, setColumnForm] = useState({ name: "", color: "#F97316" });
 
   useEffect(() => { loadData(); }, []);
@@ -118,11 +143,29 @@ export function CRM() {
     setEditForm({
       name: data.name ?? "",
       phone: data.phone ?? "",
+      celular: data.celular ?? "",
       email: data.email ?? "",
       cpf_cnpj: data.cpf_cnpj ?? "",
       address: data.address ?? "",
       origin: data.origin ?? "",
       notes: stripAnexos(data.notes),
+      rg: data.rg ?? "",
+      orgao_expedidor: data.orgao_expedidor ?? "",
+      data_nascimento: data.data_nascimento ?? "",
+      uc: data.uc ?? "",
+      nacionalidade: data.nacionalidade ?? "",
+      cnh: data.cnh ?? "",
+      estado_civil: data.estado_civil ?? "",
+      nome_mae: data.nome_mae ?? "",
+      razao_social: data.razao_social ?? "",
+      nome_fantasia: data.nome_fantasia ?? "",
+      enquadramento: data.enquadramento ?? "",
+      inscricao_municipal: data.inscricao_municipal ?? "",
+      inscricao_estadual: data.inscricao_estadual ?? "",
+      data_abertura_empresa: data.data_abertura_empresa ?? "",
+      cnae: data.cnae ?? "",
+      faturamento_12m: data.faturamento_12m ?? "",
+      tipo_projeto: data.tipo_projeto ?? "",
     });
     setEditingClient(false);
     setConfirmDeleteClient(false);
@@ -198,13 +241,32 @@ export function CRM() {
     criacao: "🆕", movimentacao: "🔄", anotacao: "📝", compra: "🛒", obra: "🏗️"
   };
 
-  const editFields: { label: string; key: keyof typeof editForm; placeholder: string }[] = [
-    { label: "Nome", key: "name", placeholder: "Nome do cliente" },
+  const editFields: { label: string; key: keyof typeof editForm; placeholder: string; section?: string }[] = [
+    { label: "Nome", key: "name", placeholder: "Nome do cliente", section: "Dados Pessoais" },
     { label: "Telefone", key: "phone", placeholder: "(00) 00000-0000" },
+    { label: "Celular", key: "celular", placeholder: "(00) 00000-0000" },
     { label: "E-mail", key: "email", placeholder: "email@exemplo.com" },
-    { label: "CPF/CNPJ", key: "cpf_cnpj", placeholder: "000.000.000-00" },
+    { label: "CPF", key: "cpf_cnpj", placeholder: "000.000.000-00" },
+    { label: "RG", key: "rg", placeholder: "00.000.000-0" },
+    { label: "Órgão Expedidor", key: "orgao_expedidor", placeholder: "SSP/GO" },
+    { label: "Data de Nascimento", key: "data_nascimento", placeholder: "DD/MM/AAAA" },
+    { label: "Nacionalidade", key: "nacionalidade", placeholder: "Brasileiro(a)" },
+    { label: "Estado Civil", key: "estado_civil", placeholder: "Solteiro(a), Casado(a)..." },
+    { label: "Nome da Mãe", key: "nome_mae", placeholder: "Nome completo da mãe" },
+    { label: "CNH", key: "cnh", placeholder: "Número da CNH" },
     { label: "Endereço", key: "address", placeholder: "Rua, número, cidade" },
-    { label: "Origem", key: "origin", placeholder: "Ex: Indicação, Instagram..." },
+    { label: "UC (Unidade Consumidora)", key: "uc", placeholder: "Número da UC" },
+    { label: "Origem", key: "origin", placeholder: "Ex: Indicação, Instagram...", section: "Comercial" },
+    { label: "Tipo de Projeto", key: "tipo_projeto", placeholder: "Ex: Residencial, Comercial..." },
+    { label: "Razão Social", key: "razao_social", placeholder: "Razão social da empresa", section: "Empresa" },
+    { label: "Nome Fantasia", key: "nome_fantasia", placeholder: "Nome fantasia" },
+    { label: "CNPJ", key: "cpf_cnpj", placeholder: "00.000.000/0000-00" },
+    { label: "Enquadramento", key: "enquadramento", placeholder: "MEI, ME, EPP..." },
+    { label: "Inscrição Municipal", key: "inscricao_municipal", placeholder: "Número" },
+    { label: "Inscrição Estadual", key: "inscricao_estadual", placeholder: "Número" },
+    { label: "Data de Abertura", key: "data_abertura_empresa", placeholder: "DD/MM/AAAA" },
+    { label: "CNAE", key: "cnae", placeholder: "Código CNAE" },
+    { label: "Faturamento 12m", key: "faturamento_12m", placeholder: "R$ 0,00" },
   ];
 
   return (
@@ -466,18 +528,34 @@ export function CRM() {
               <div className="space-y-4 py-2">
                 {editingClient ? (
                   /* ---- Modo edição ---- */
-                  <div className="space-y-3">
-                    {editFields.filter(f => f.key !== "name").map(f => (
-                      <div key={f.key} className="space-y-1">
-                        <Label className="text-white/60 text-xs">{f.label}</Label>
-                        <Input
-                          placeholder={f.placeholder}
-                          value={editForm[f.key]}
-                          onChange={e => setEditForm(ef => ({ ...ef, [f.key]: e.target.value }))}
-                          className="border-white/10 bg-white/5 text-white placeholder:text-white/20"
-                        />
-                      </div>
-                    ))}
+                  <div className="space-y-4">
+                    {(() => {
+                      const fieldsToRender = editFields.filter(f => f.key !== "name");
+                      const seen = new Set<string>();
+                      return fieldsToRender.map((f, i) => {
+                        const isDupe = seen.has(f.key);
+                        seen.add(f.key);
+                        if (isDupe) return null;
+                        return (
+                          <div key={`${f.key}-${i}`}>
+                            {f.section && (
+                              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2 mt-2 border-b border-white/5 pb-1">
+                                {f.section}
+                              </p>
+                            )}
+                            <div className="space-y-1">
+                              <Label className="text-white/60 text-xs">{f.label}</Label>
+                              <Input
+                                placeholder={f.placeholder}
+                                value={editForm[f.key]}
+                                onChange={e => setEditForm(ef => ({ ...ef, [f.key]: e.target.value }))}
+                                className="border-white/10 bg-white/5 text-white placeholder:text-white/20"
+                              />
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                     <div className="space-y-1">
                       <Label className="text-white/60 text-xs">Observações</Label>
                       <Textarea
@@ -491,35 +569,72 @@ export function CRM() {
                 ) : (
                   /* ---- Modo leitura ---- */
                   <>
-                    <div className="grid grid-cols-2 gap-3">
-                      {clientDetail.phone && (
-                        <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
-                          <Phone className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                          <span className="text-xs text-white/70">{clientDetail.phone}</span>
+                    {/* Contato */}
+                    {(clientDetail.phone || clientDetail.celular || clientDetail.email) && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2 border-b border-white/5 pb-1">Contato</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {clientDetail.phone && <InfoRow icon={<Phone className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Telefone" value={clientDetail.phone} />}
+                          {clientDetail.celular && <InfoRow icon={<Phone className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Celular" value={clientDetail.celular} />}
+                          {clientDetail.email && <InfoRow icon={<Mail className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="E-mail" value={clientDetail.email} span />}
                         </div>
-                      )}
-                      {clientDetail.email && (
-                        <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
-                          <Mail className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                          <span className="text-xs text-white/70 truncate">{clientDetail.email}</span>
-                        </div>
-                      )}
-                      {clientDetail.cpf_cnpj && (
-                        <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
-                          <FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                          <span className="text-xs text-white/70">{clientDetail.cpf_cnpj}</span>
-                        </div>
-                      )}
-                      {clientDetail.origin && (
-                        <div className="flex items-center gap-2 p-2 rounded-lg border border-white/5 bg-white/5">
-                          <User className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                          <span className="text-xs text-white/70">{clientDetail.origin}</span>
-                        </div>
-                      )}
-                    </div>
-                    {clientDetail.address && (
-                      <p className="text-xs text-white/50 px-1">📍 {clientDetail.address}</p>
+                      </div>
                     )}
+
+                    {/* Dados Pessoais */}
+                    {(clientDetail.cpf_cnpj || clientDetail.rg || clientDetail.data_nascimento || clientDetail.nacionalidade || clientDetail.estado_civil || clientDetail.nome_mae || clientDetail.cnh || clientDetail.uc) && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2 border-b border-white/5 pb-1">Dados Pessoais</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {clientDetail.cpf_cnpj && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="CPF" value={clientDetail.cpf_cnpj} />}
+                          {clientDetail.rg && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="RG" value={`${clientDetail.rg}${clientDetail.orgao_expedidor ? ' / ' + clientDetail.orgao_expedidor : ''}`} />}
+                          {clientDetail.data_nascimento && <InfoRow icon={<Clock className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Nascimento" value={clientDetail.data_nascimento} />}
+                          {clientDetail.nacionalidade && <InfoRow icon={<User className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Nacionalidade" value={clientDetail.nacionalidade} />}
+                          {clientDetail.estado_civil && <InfoRow icon={<User className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Estado Civil" value={clientDetail.estado_civil} />}
+                          {clientDetail.nome_mae && <InfoRow icon={<User className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Nome da Mãe" value={clientDetail.nome_mae} span />}
+                          {clientDetail.cnh && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="CNH" value={clientDetail.cnh} />}
+                          {clientDetail.uc && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="UC" value={clientDetail.uc} />}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Endereço */}
+                    {clientDetail.address && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2 border-b border-white/5 pb-1">Endereço</p>
+                        <p className="text-xs text-white/60 px-1">📍 {clientDetail.address}</p>
+                      </div>
+                    )}
+
+                    {/* Comercial */}
+                    {(clientDetail.origin || clientDetail.tipo_projeto) && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2 border-b border-white/5 pb-1">Comercial</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {clientDetail.origin && <InfoRow icon={<User className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Origem" value={clientDetail.origin} />}
+                          {clientDetail.tipo_projeto && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Tipo de Projeto" value={clientDetail.tipo_projeto} />}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empresa */}
+                    {(clientDetail.razao_social || clientDetail.nome_fantasia || clientDetail.enquadramento || clientDetail.cnae || clientDetail.inscricao_municipal || clientDetail.inscricao_estadual || clientDetail.data_abertura_empresa || clientDetail.faturamento_12m) && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2 border-b border-white/5 pb-1">Empresa</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {clientDetail.razao_social && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Razão Social" value={clientDetail.razao_social} span />}
+                          {clientDetail.nome_fantasia && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Nome Fantasia" value={clientDetail.nome_fantasia} span />}
+                          {clientDetail.enquadramento && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Enquadramento" value={clientDetail.enquadramento} />}
+                          {clientDetail.cnae && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="CNAE" value={clientDetail.cnae} />}
+                          {clientDetail.inscricao_municipal && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Insc. Municipal" value={clientDetail.inscricao_municipal} />}
+                          {clientDetail.inscricao_estadual && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Insc. Estadual" value={clientDetail.inscricao_estadual} />}
+                          {clientDetail.data_abertura_empresa && <InfoRow icon={<Clock className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Abertura" value={clientDetail.data_abertura_empresa} />}
+                          {clientDetail.faturamento_12m && <InfoRow icon={<FileText className="h-3.5 w-3.5 text-orange-400 shrink-0" />} label="Faturamento 12m" value={clientDetail.faturamento_12m} />}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Observações */}
                     {stripAnexos(clientDetail.notes) && (
                       <div className="p-3 rounded-lg border border-white/5 bg-white/5">
                         <p className="text-xs text-white/50 mb-1">Observações</p>
