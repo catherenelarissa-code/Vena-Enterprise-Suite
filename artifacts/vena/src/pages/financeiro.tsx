@@ -249,7 +249,6 @@ function AccountModal({ editing, defaultType, onClose, onSaved, suppliers, categ
 
           {form.type === "receivable" && (
             <div className="space-y-1.5">
-              <Label className="text-white/60 text-xs flex items-center gap-1"><User className="h-3.5 w-3.5" /> Cliente</Label>
               <ClientSearchInput
                 value={form.clientName}
                 selectedId={form.clientId ? parseInt(form.clientId) : null}
