@@ -58,6 +58,7 @@ router.post("/", async (req, res) => {
     phone: req.body.phone,
     cnpj: req.body.cnpj,
     address: req.body.address,
+    pixKey: req.body.pixKey,   // <-- adicionar
     notes: req.body.notes,
   }).returning();
   const full = await getSupplierWithScores(supplier.id);
@@ -80,6 +81,7 @@ router.patch("/:id", async (req, res) => {
     phone: req.body.phone,
     cnpj: req.body.cnpj,
     address: req.body.address,
+    pixKey: req.body.pixKey,   // <-- adicionar
     notes: req.body.notes,
   }).where(eq(suppliersTable.id, id));
   const full = await getSupplierWithScores(id);
