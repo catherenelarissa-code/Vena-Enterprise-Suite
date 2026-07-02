@@ -1,4 +1,4 @@
-iport { Router } from "express";
+import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   suppliersTable,
