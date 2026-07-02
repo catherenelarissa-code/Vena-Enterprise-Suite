@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ClientSearchInput } from "@/components/SearchInputs";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -96,6 +96,9 @@ function ProjectModal({
   const { mutateAsync: updateProject, isPending: isUpdating } = useUpdateProject();
 
   const [form, setForm] = useState<ProjectForm>({
+    client: editing?.client ?? "",
+    clientId: editing?.clientId ?? null,
+});
     name: editing?.name ?? "",
     costCenter: editing?.costCenter ?? "",
     client: editing?.client ?? "",
@@ -205,25 +208,12 @@ function ProjectModal({
           </div>
 
           {/* Cliente */}
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> Cliente *</Label>
-            {clients.length > 0 ? (
-              <Select value={form.client} onValueChange={v => setForm(f => ({ ...f, client: v }))}>
-                <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-                <SelectContent>
-                  {clients.map((c: any) => (
-                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Input
-                placeholder="Nome do cliente"
-                value={form.client}
-                onChange={e => setForm(f => ({ ...f, client: e.target.value }))}
-              />
-            )}
-          </div>
+          <ClientSearchInput
+  label="Cliente *"
+  value={form.client}
+  selectedId={form.clientId}
+  onChange={(id, name) => setForm(f => ({ ...f, clientId: id, client: name }))}
+/>
 
           <div className="space-y-1.5">
             <Label>Local / Município</Label>
