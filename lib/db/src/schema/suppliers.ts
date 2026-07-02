@@ -26,6 +26,20 @@ export const supplierEvaluationsTable = pgTable("supplier_evaluations", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const suppliersTable = pgTable("suppliers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  contact: text("contact").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  cnpj: text("cnpj"),
+  address: text("address"),
+  pixKey: text("pix_key"),   // <-- adicionar esta linha
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertSupplierSchema = createInsertSchema(suppliersTable).omit({ id: true, createdAt: true });
 export const insertSupplierEvaluationSchema = createInsertSchema(supplierEvaluationsTable).omit({ id: true, createdAt: true });
 
