@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
 import * as pdfjsLib from "pdfjs-dist";
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker?url";
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
