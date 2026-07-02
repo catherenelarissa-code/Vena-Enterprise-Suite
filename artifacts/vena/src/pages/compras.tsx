@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CentroCustoSearchInput } from "@/components/SearchInputs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -245,7 +246,8 @@ export function Compras() {
   const [title, setTitle] = useState("");
   const [urgency, setUrgency] = useState("normal");
   const [notes, setNotes] = useState("");
-  const [project, setProject] = useState("");
+  const [obraName, setObraName] = useState("");
+  const [obraId, setObraId] = useState<number | null>(null);
   const [items, setItems] = useState<Item[]>([{ materialName: "", quantity: "", unit: "un", notes: "" }]);
 
   const queryClient = useQueryClient();
@@ -265,7 +267,8 @@ export function Compras() {
   function handleOcrExtracted(extracted: Item[]) { setItems(extracted); }
   function handleCloseModal() {
     setShowModal(false);
-    setTitle(""); setUrgency("normal"); setNotes(""); setProject("");
+    setTitle(""); setUrgency("normal"); setNotes("");
+    setObraName(""); setObraId(null);
     setItems([{ materialName: "", quantity: "", unit: "un", notes: "" }]);
   }
 
@@ -294,6 +297,7 @@ export function Compras() {
     createRequest({
       data: {
         title, requestedBy: "Usuário atual", urgency: urgency as any, notes,
+        projectId: obraId ?? undefined,
         items: items.map(i => ({ materialName: i.materialName, quantity: parseFloat(i.quantity), unit: i.unit, notes: i.notes })),
       }
     }, {
@@ -431,8 +435,11 @@ export function Compras() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Obra (opcional)</Label>
-                <Input placeholder="Nome da obra" value={project} onChange={(e) => setProject(e.target.value)} />
+                <CentroCustoSearchInput
+                  value={obraName}
+                  selectedId={obraId}
+                  onChange={(id, name) => { setObraId(id); setObraName(name); }}
+                />
               </div>
               <div className="col-span-2 space-y-2">
                 <Label>Observações</Label>
