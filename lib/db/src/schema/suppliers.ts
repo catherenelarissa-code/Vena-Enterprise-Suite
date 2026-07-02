@@ -11,6 +11,7 @@ export const suppliersTable = pgTable("suppliers", {
   phone: text("phone"),
   cnpj: text("cnpj"),
   address: text("address"),
+  pixKey: text("pix_key"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -23,20 +24,6 @@ export const supplierEvaluationsTable = pgTable("supplier_evaluations", {
   qualityScore: numeric("quality_score", { precision: 3, scale: 1 }).notNull(),
   notes: text("notes"),
   purchaseOrderId: integer("purchase_order_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const suppliersTable = pgTable("suppliers", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  category: text("category").notNull(),
-  contact: text("contact").notNull(),
-  email: text("email"),
-  phone: text("phone"),
-  cnpj: text("cnpj"),
-  address: text("address"),
-  pixKey: text("pix_key"),   // <-- adicionar esta linha
-  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
