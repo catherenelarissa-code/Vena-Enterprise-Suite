@@ -58,11 +58,47 @@ router.post("/", async (req, res) => {
     phone: req.body.phone,
     cnpj: req.body.cnpj,
     address: req.body.address,
-    pixKey: req.body.pixKey,   // <-- adicionar
+    pixKey: req.body.pixKey,
     notes: req.body.notes,
   }).returning();
   const full = await getSupplierWithScores(supplier.id);
   return res.status(201).json(full);
+});
+
+// IMPORTANTE: rotas estáticas (ex: /monthly-discounts) precisam vir
+// ANTES de rotas com parâmetro (ex: /:id), senão o Express interpreta
+// "monthly-discounts" como um :id e nunca chega aqui.
+
+// GET /monthly-discounts
+// Valor em R$ economizado por mês, considerando apenas cotações aprovadas
+// (discount% aplicado sobre o valor total dos itens daquela cotação).
+router.get("/monthly-discounts", async (req, res) => {
+  try {
+    const approvedQuotes = await db.select().from(quotesTable).where(eq(quotesTable.status, "approved"));
+
+    const monthlyMap: Record<string, number> = {};
+
+    for (const quote of approvedQuotes) {
+      const discountPercent = parseFloat(quote.discount ?? "0");
+      if (!discountPercent) continue;
+
+      const items = await db.select().from(quoteItemsTable).where(eq(quoteItemsTable.quoteId, quote.id));
+      const quoteTotal = items.reduce((sum, item) => sum + parseFloat(item.unitPrice) * parseFloat(item.quantity), 0);
+      const savedAmount = quoteTotal * (discountPercent / 100);
+
+      const month = quote.createdAt.toISOString().slice(0, 7); // YYYY-MM
+      monthlyMap[month] = (monthlyMap[month] ?? 0) + savedAmount;
+    }
+
+    const result = Object.entries(monthlyMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, savedAmount]) => ({ month, savedAmount: Math.round(savedAmount * 100) / 100 }));
+
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erro ao calcular descontos mensais" });
+  }
 });
 
 router.get("/:id", async (req, res) => {
@@ -81,7 +117,7 @@ router.patch("/:id", async (req, res) => {
     phone: req.body.phone,
     cnpj: req.body.cnpj,
     address: req.body.address,
-    pixKey: req.body.pixKey,   // <-- adicionar
+    pixKey: req.body.pixKey,
     notes: req.body.notes,
   }).where(eq(suppliersTable.id, id));
   const full = await getSupplierWithScores(id);
@@ -129,38 +165,6 @@ router.get("/:id/price-history", async (req, res) => {
     }
   }
   return res.json(history);
-});
-
-// GET /monthly-discounts
-// Valor em R$ economizado por mês, considerando apenas cotações aprovadas
-// (discount% aplicado sobre o valor total dos itens daquela cotação).
-router.get("/monthly-discounts", async (req, res) => {
-  try {
-    const approvedQuotes = await db.select().from(quotesTable).where(eq(quotesTable.status, "approved"));
-
-    const monthlyMap: Record<string, number> = {};
-
-    for (const quote of approvedQuotes) {
-      const discountPercent = parseFloat(quote.discount ?? "0");
-      if (!discountPercent) continue;
-
-      const items = await db.select().from(quoteItemsTable).where(eq(quoteItemsTable.quoteId, quote.id));
-      const quoteTotal = items.reduce((sum, item) => sum + parseFloat(item.unitPrice) * parseFloat(item.quantity), 0);
-      const savedAmount = quoteTotal * (discountPercent / 100);
-
-      const month = quote.createdAt.toISOString().slice(0, 7); // YYYY-MM
-      monthlyMap[month] = (monthlyMap[month] ?? 0) + savedAmount;
-    }
-
-    const result = Object.entries(monthlyMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, savedAmount]) => ({ month, savedAmount: Math.round(savedAmount * 100) / 100 }));
-
-    return res.json(result);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Erro ao calcular descontos mensais" });
-  }
 });
 
 export default router;
